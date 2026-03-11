@@ -1,5 +1,10 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const TOAST_EXIT_MS = 280;
 
 export function FlashMessage({
   status,
@@ -12,13 +17,63 @@ export function FlashMessage({
     return null;
   }
 
+  return (
+    <FlashMessageToast
+      key={`${status ?? ""}:${message}`}
+      message={message}
+      status={status}
+    />
+  );
+}
+
+function FlashMessageToast({
+  status,
+  message,
+}: {
+  status?: string;
+  message: string;
+}) {
+  const [isVisible, setIsVisible] = useState(true);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const durationMs = useMemo(() => {
+    return Math.min(14000, Math.max(4000, 2500 + message.length * 45));
+  }, [message]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setIsClosing(true);
+    }, durationMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [durationMs]);
+
+  useEffect(() => {
+    if (!isClosing) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setIsVisible(false);
+    }, TOAST_EXIT_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [isClosing]);
+
+  if (!isVisible) {
+    return null;
+  }
+
   const success = status === "success";
   const Icon = success ? CheckCircle2 : AlertCircle;
 
   return (
     <div
+      aria-live="polite"
+      role="status"
       className={cn(
-        "flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm",
+        "fixed right-4 top-4 z-50 flex w-[min(92vw,28rem)] items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-lg backdrop-blur",
+        isClosing ? "toast-exit" : "toast-enter",
         success
           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
           : "border-rose-200 bg-rose-50 text-rose-800",

@@ -160,3 +160,14 @@ export const voleiTypesWithSetter = new Set([
   "QUADRA_CHEIA",
   "QUADRA_QUARTETO",
 ]);
+
+export const defaultCoverByModality: Record<string, string> = {
+  FUTEBOL: "/covers/futebol.svg",
+  FUTSAL: "/covers/futsal.svg",
+  VOLEI: "/covers/volei.svg",
+  BASQUETE: "/covers/basquete.svg",
+  BEACH_TENNIS: "/covers/beach-tennis.svg",
+  TENIS: "/covers/tenis.svg",
+  CORRIDA: "/covers/corrida.svg",
+  OUTRO: "/covers/outro.svg",
+};

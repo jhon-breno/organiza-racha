@@ -84,6 +84,16 @@ export const rachaFormSchema = z
         message: "Informe a chave secreta para rachas privados.",
       });
     }
+
+    const eventDateTime = new Date(`${data.eventDate}T${data.eventTime}:00`);
+
+    if (!Number.isNaN(eventDateTime.getTime()) && eventDateTime <= new Date()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["eventDate"],
+        message: "A data e o horário do racha devem estar no futuro.",
+      });
+    }
   });
 
 export const enrollmentSchema = z.object({

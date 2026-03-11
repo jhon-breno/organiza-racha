@@ -20,6 +20,7 @@ import {
   formatCurrencyFromCents,
   formatDateTime,
   getPrivateRachaAccessCookieName,
+  getRachaCoverImageUrl,
   getInitials,
 } from "@/lib/utils";
 
@@ -40,6 +41,12 @@ export default async function RachaDetailsPage({
   const racha = await prisma.racha.findUnique({
     where: { slug },
     include: {
+      organizer: {
+        select: {
+          image: true,
+          name: true,
+        },
+      },
       enrollments: {
         orderBy: [{ createdAt: "asc" }],
       },
@@ -62,20 +69,24 @@ export default async function RachaDetailsPage({
   const confirmedParticipants = racha.enrollments.filter(
     (item) => item.status === "ACTIVE",
   );
+  const coverImageUrl = getRachaCoverImageUrl(
+    racha.modality,
+    racha.coverImageUrl,
+  );
+  const organizerAvatarUrl =
+    racha.profileImageUrl || racha.organizer.image || null;
+  const organizerDisplayName =
+    racha.organizerDisplayName || racha.organizer.name || "Organizador";
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       <div
         className="overflow-hidden rounded-4xl border border-slate-200 bg-slate-900 text-white"
-        style={
-          racha.coverImageUrl
-            ? {
-                backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.75)), url(${racha.coverImageUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
+        style={{
+          backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.75)), url(${coverImageUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       >
         <div className="grid gap-8 px-6 py-10 lg:grid-cols-[1.2fr_0.8fr] lg:px-10">
           <div className="space-y-5">
@@ -163,23 +174,21 @@ export default async function RachaDetailsPage({
               <div
                 className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-600 text-xl font-black text-white"
                 style={
-                  racha.profileImageUrl
+                  organizerAvatarUrl
                     ? {
-                        backgroundImage: `url(${racha.profileImageUrl})`,
+                        backgroundImage: `url(${organizerAvatarUrl})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                       }
                     : undefined
                 }
               >
-                {racha.profileImageUrl
-                  ? ""
-                  : getInitials(racha.organizerDisplayName)}
+                {organizerAvatarUrl ? "" : getInitials(organizerDisplayName)}
               </div>
               <div>
                 <p className="text-sm text-slate-500">Organizador</p>
                 <p className="text-lg font-bold text-slate-950">
-                  {racha.organizerDisplayName}
+                  {organizerDisplayName}
                 </p>
                 <p className="text-sm text-slate-600">
                   WhatsApp: {racha.phoneWhatsapp}

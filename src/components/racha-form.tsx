@@ -68,6 +68,9 @@ export function RachaForm({
   const [modality, setModality] = useState(
     defaultValues?.modality ?? "FUTEBOL",
   );
+  const [visibility, setVisibility] = useState(
+    defaultValues?.visibility ?? "OPEN",
+  );
   const [voleiType, setVoleiType] = useState(defaultValues?.voleiType ?? "");
   const [hasFixedSetter, setHasFixedSetter] = useState(
     defaultValues?.hasFixedSetter ?? false,
@@ -75,8 +78,10 @@ export function RachaForm({
 
   const isFutebol = modality === "FUTEBOL";
   const isVolei = modality === "VOLEI";
+  const isPrivateVisibility = visibility === "PRIVATE";
   const showSetterLimit =
     isVolei && hasFixedSetter && voleiTypesWithSetter.has(voleiType);
+  const minEventDate = formatDateInput(new Date());
 
   function saveDraftSnapshot() {
     if (!formRef.current) {
@@ -144,7 +149,11 @@ export function RachaForm({
 
             element.value = value;
 
-            if (element.name === "modality" || element.name === "voleiType") {
+            if (
+              element.name === "modality" ||
+              element.name === "voleiType" ||
+              element.name === "visibility"
+            ) {
               element.dispatchEvent(new Event("change", { bubbles: true }));
             }
           });
@@ -152,6 +161,7 @@ export function RachaForm({
       };
 
       requestAnimationFrame(() => {
+        applySnapshot();
         requestAnimationFrame(applySnapshot);
       });
     } catch {
@@ -182,7 +192,14 @@ export function RachaForm({
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [fieldWithError, hasValidationError, modality, voleiType, hasFixedSetter]);
+  }, [
+    fieldWithError,
+    hasValidationError,
+    modality,
+    voleiType,
+    hasFixedSetter,
+    visibility,
+  ]);
 
   return (
     <form
@@ -395,6 +412,7 @@ export function RachaForm({
                   ? formatDateInput(defaultValues.eventDate)
                   : ""
               }
+              min={isEditing ? undefined : minEventDate}
               name="eventDate"
               type="date"
               required
@@ -564,8 +582,9 @@ export function RachaForm({
         <div>
           <h3 className="text-xl font-bold text-slate-950">Mídia e acesso</h3>
           <p className="mt-1 text-sm text-slate-600">
-            Você pode manter URLs de imagens externas e definir se o racha será
-            aberto ou privado.
+            As imagens são opcionais: sem capa, usamos uma capa padrão da
+            modalidade; sem foto de perfil, usamos a foto do login Google (ou
+            iniciais do nome).
           </p>
         </div>
 
@@ -575,7 +594,7 @@ export function RachaForm({
             <Input
               defaultValue={defaultValues?.coverImageUrl ?? ""}
               name="coverImageUrl"
-              placeholder="https://..."
+              placeholder="https://... (opcional)"
             />
           </label>
 
@@ -584,7 +603,7 @@ export function RachaForm({
             <Input
               defaultValue={defaultValues?.profileImageUrl ?? ""}
               name="profileImageUrl"
-              placeholder="https://..."
+              placeholder="https://... (opcional)"
             />
           </label>
 
@@ -593,6 +612,7 @@ export function RachaForm({
             <Select
               defaultValue={defaultValues?.visibility ?? "OPEN"}
               name="visibility"
+              onChange={(e) => setVisibility(e.target.value)}
             >
               {visibilityOptions.map((item) => (
                 <option key={item.value} value={item.value}>
@@ -602,14 +622,16 @@ export function RachaForm({
             </Select>
           </label>
 
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Chave secreta
-            <Input
-              defaultValue={defaultValues?.accessKey ?? ""}
-              name="accessKey"
-              placeholder="Ex.: VIP2026"
-            />
-          </label>
+          {isPrivateVisibility ? (
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Chave secreta
+              <Input
+                defaultValue={defaultValues?.accessKey ?? ""}
+                name="accessKey"
+                placeholder="Ex.: VIP2026"
+              />
+            </label>
+          ) : null}
         </div>
       </Card>
 

@@ -255,7 +255,7 @@ export async function createRachaAction(formData: FormData) {
       whatsappGroupUrl: parsed.data.whatsappGroupUrl || null,
       pixKey: parsed.data.pixKey,
       coverImageUrl: parsed.data.coverImageUrl || null,
-      profileImageUrl: parsed.data.profileImageUrl || null,
+      profileImageUrl: parsed.data.profileImageUrl || user.image || null,
       visibility: parsed.data.visibility,
       accessKey:
         parsed.data.visibility === Visibility.PRIVATE
@@ -365,7 +365,7 @@ export async function updateRachaAction(formData: FormData) {
       whatsappGroupUrl: parsed.data.whatsappGroupUrl || null,
       pixKey: parsed.data.pixKey,
       coverImageUrl: parsed.data.coverImageUrl || null,
-      profileImageUrl: parsed.data.profileImageUrl || null,
+      profileImageUrl: parsed.data.profileImageUrl || user.image || null,
       visibility: parsed.data.visibility,
       accessKey:
         parsed.data.visibility === Visibility.PRIVATE

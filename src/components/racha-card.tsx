@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { modalityLabels } from "@/lib/constants";
-import { formatCurrencyFromCents, formatDateTime } from "@/lib/utils";
+import {
+  formatCurrencyFromCents,
+  formatDateTime,
+  getRachaCoverImageUrl,
+} from "@/lib/utils";
 
 type RachaCardProps = {
   racha: Racha & {
@@ -14,19 +18,20 @@ type RachaCardProps = {
 };
 
 export function RachaCard({ racha }: RachaCardProps) {
+  const coverImageUrl = getRachaCoverImageUrl(
+    racha.modality,
+    racha.coverImageUrl,
+  );
+
   return (
     <Card className="overflow-hidden p-0">
       <div
         className="h-40 bg-linear-to-br from-teal-700 via-cyan-700 to-emerald-600"
-        style={
-          racha.coverImageUrl
-            ? {
-                backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.45)), url(${racha.coverImageUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
+        style={{
+          backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.45)), url(${coverImageUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       />
       <div className="space-y-4 p-6">
         <div className="flex flex-wrap items-center gap-2">

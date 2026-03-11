@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
+import { defaultCoverByModality } from "@/lib/constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -85,4 +86,15 @@ export function getInitials(name?: string | null) {
 
 export function getPrivateRachaAccessCookieName(rachaId: string) {
   return `private-racha-access-${rachaId}`;
+}
+
+export function getRachaCoverImageUrl(
+  modality: string,
+  coverImageUrl?: string | null,
+) {
+  if (coverImageUrl && coverImageUrl.trim().length > 0) {
+    return coverImageUrl;
+  }
+
+  return defaultCoverByModality[modality] ?? defaultCoverByModality.OUTRO;
 }

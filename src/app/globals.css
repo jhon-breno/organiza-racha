@@ -52,3 +52,33 @@ select {
 iframe {
   border: 0;
 }
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 0.28s ease-out both;
+}
+
+.toast-exit {
+  animation: toast-out 0.28s ease-in both;
+}

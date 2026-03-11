@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PlusCircle, Trophy } from "lucide-react";
 import { auth } from "@/auth";
 import { signOutAction } from "@/actions";
+import { MobileHeaderMenu } from "@/components/mobile-header-menu";
 import { Button } from "@/components/ui/button";
 
 export async function AppHeader() {
@@ -50,6 +51,8 @@ export async function AppHeader() {
             </Button>
           )}
         </nav>
+
+        <MobileHeaderMenu user={session?.user ?? null} />
       </div>
     </header>
   );
