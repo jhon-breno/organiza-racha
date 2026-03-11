@@ -1,65 +1,196 @@
-import Image from "next/image";
+import { auth } from "@/auth";
+import { EmptyState } from "@/components/empty-state";
+import { FiltersBar } from "@/components/filters-bar";
+import { FlashMessage } from "@/components/flash-message";
+import { RachaCard } from "@/components/racha-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { modalities } from "@/lib/constants";
+import { prisma } from "@/lib/prisma";
 
-export default function Home() {
+type SearchParams = Promise<{
+  q?: string;
+  modality?: string;
+  visibility?: string;
+  status?: string;
+  message?: string;
+}>;
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const session = await auth();
+  const q = params.q?.trim() ?? "";
+  const modality = params.modality?.trim() ?? "";
+  const visibility = params.visibility?.trim() ?? "";
+
+  const rachas = await prisma.racha.findMany({
+    where: {
+      status: "PUBLISHED",
+      eventDate: { gte: new Date() },
+      ...(modality ? { modality: modality as never } : {}),
+      ...(visibility ? { visibility: visibility as never } : {}),
+      ...(q
+        ? {
+            OR: [
+              { title: { contains: q } },
+              { city: { contains: q } },
+              { address: { contains: q } },
+              { locationName: { contains: q } },
+              { organizerDisplayName: { contains: q } },
+              { phoneWhatsapp: { contains: q } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      organizer: true,
+      enrollments: {
+        where: { status: { in: ["ACTIVE", "WAITLIST"] } },
+        select: { id: true, status: true },
+      },
+    },
+    orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }],
+  });
+
+  const [totalRachas, totalOrganizadores, totalInscricoes] = await Promise.all([
+    prisma.racha.count({ where: { status: "PUBLISHED" } }),
+    prisma.user.count({ where: { rachas: { some: {} } } }),
+    prisma.enrollment.count({
+      where: { status: { in: ["ACTIVE", "WAITLIST"] } },
+    }),
+  ]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
+      <section className="grid gap-6 rounded-4xl bg-linear-to-br from-emerald-600 via-teal-600 to-cyan-700 px-6 py-10 text-white shadow-2xl shadow-teal-950/15 lg:grid-cols-[1.4fr_0.8fr] lg:px-10">
+        <div className="space-y-6">
+          <Badge className="bg-white/15 text-white ring-1 ring-white/20">
+            Gestão completa para rachas esportivos
+          </Badge>
+          <div className="space-y-4">
+            <h1 className="max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">
+              Organiza Racha: publique, organize e lote seu racha sem planilha
+              nem confusão.
+            </h1>
+            <p className="max-w-2xl text-base text-white/85 sm:text-lg">
+              Cadastre rachas com regras, limite de atletas, PIX, WhatsApp,
+              local com Google Maps, vagas públicas ou privadas e pedido de
+              reembolso com prazo configurável.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              asChild
+              href={session?.user ? "/dashboard/rachas/new" : "/auth/signin"}
+              size="lg"
+              variant="secondary"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Criar meu racha
+            </Button>
+            <Button
+              asChild
+              className="border border-white/20 bg-white/10 text-white hover:bg-white/20"
+              href="#lista-rachas"
+              size="lg"
             >
-              Learning
-            </a>{" "}
-            center.
+              Explorar rachas
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+          <div className="rounded-3xl bg-white/12 p-5 backdrop-blur-sm">
+            <p className="text-sm text-white/70">Rachas publicados</p>
+            <p className="mt-2 text-3xl font-black">{totalRachas}</p>
+          </div>
+          <div className="rounded-3xl bg-white/12 p-5 backdrop-blur-sm">
+            <p className="text-sm text-white/70">Organizadores ativos</p>
+            <p className="mt-2 text-3xl font-black">{totalOrganizadores}</p>
+          </div>
+          <div className="rounded-3xl bg-white/12 p-5 backdrop-blur-sm">
+            <p className="text-sm text-white/70">Inscrições registradas</p>
+            <p className="mt-2 text-3xl font-black">{totalInscricoes}</p>
+          </div>
+        </div>
+      </section>
+
+      <FlashMessage message={params.message} status={params.status} />
+
+      <section className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
+            Como funciona
+          </p>
+          <h2 className="text-2xl font-bold text-slate-950">
+            Portal pensado para quem organiza e para quem participa.
+          </h2>
+          <p className="text-sm leading-7 text-slate-600">
+            O organizador publica o evento com regras, valor, capacidade, mapa,
+            grupo do WhatsApp e chave PIX. O atleta acessa, aceita as regras,
+            informa posição e nível, confirma o pagamento e acompanha sua vaga.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-950">
+              Extras incluídos
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Lista de espera, painel do organizador, confirmação de PIX e fluxo
+              de reembolso.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-950">
+              Login facilitado
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              O projeto já vem preparado para Google Login e também oferece modo
+              demo local para acelerar testes.
+            </p>
+          </div>
         </div>
-      </main>
+      </section>
+
+      <section className="space-y-6" id="lista-rachas">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
+            Buscar rachas
+          </p>
+          <h2 className="text-3xl font-bold text-slate-950">
+            Encontre seu próximo jogo por nome, local, modalidade ou
+            organizador.
+          </h2>
+        </div>
+
+        <FiltersBar
+          defaultModality={modality}
+          defaultQuery={q}
+          defaultVisibility={visibility}
+          modalities={modalities}
+        />
+
+        {rachas.length === 0 ? (
+          <EmptyState
+            actionHref={
+              session?.user ? "/dashboard/rachas/new" : "/auth/signin"
+            }
+            actionLabel="Publicar um racha"
+            description="Tente ajustar os filtros ou publique o primeiro racha da plataforma."
+            title="Nenhum racha encontrado"
+          />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            {rachas.map((racha) => (
+              <RachaCard key={racha.id} racha={racha} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
