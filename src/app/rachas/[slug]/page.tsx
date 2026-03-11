@@ -11,8 +11,8 @@ import { Card } from "@/components/ui/card";
 import {
   futebolTypeLabels,
   modalityLabels,
-  participantStatusLabels,
   paymentStatusLabels,
+  participantStatusLabels,
   voleiTypeLabels,
 } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
@@ -63,11 +63,20 @@ export default async function RachaDetailsPage({
     cookieStore.get(getPrivateRachaAccessCookieName(racha.id))?.value ===
       "granted";
 
+  const visibleEnrollmentForUser = (item: {
+    userId: string;
+    status: string;
+    paymentStatus: string;
+  }) =>
+    item.userId === session?.user?.id &&
+    item.status !== "CANCELED" &&
+    item.paymentStatus !== "REFUNDED";
+
   const myEnrollment = session?.user?.id
-    ? racha.enrollments.find((item) => item.userId === session.user.id)
+    ? racha.enrollments.find(visibleEnrollmentForUser)
     : null;
-  const confirmedParticipants = racha.enrollments.filter(
-    (item) => item.status === "ACTIVE",
+  const confirmedPaidParticipants = racha.enrollments.filter(
+    (item) => item.status === "ACTIVE" && item.paymentStatus === "PAID",
   );
   const coverImageUrl = getRachaCoverImageUrl(
     racha.modality,
@@ -149,7 +158,7 @@ export default async function RachaDetailsPage({
                   Vagas
                 </p>
                 <p className="mt-2 text-sm font-semibold">
-                  {confirmedParticipants.length}/{racha.athleteLimit}
+                  {confirmedPaidParticipants.length}/{racha.athleteLimit}
                 </p>
                 {racha.modality === "FUTEBOL" && racha.goalkeeperLimit ? (
                   <p className="mt-1 text-xs text-white/70">
@@ -259,16 +268,16 @@ export default async function RachaDetailsPage({
                     Participantes inscritos e status atual.
                   </p>
                 </div>
-                <Badge>{confirmedParticipants.length} confirmados</Badge>
+                <Badge>{confirmedPaidParticipants.length} confirmados</Badge>
               </div>
 
               <div className="grid gap-3">
-                {racha.enrollments.length === 0 ? (
+                {confirmedPaidParticipants.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    Ainda não há participantes inscritos.
+                    Ainda não há participantes confirmados para o racha.
                   </p>
                 ) : (
-                  racha.enrollments.map((participant) => (
+                  confirmedPaidParticipants.map((participant) => (
                     <div
                       key={participant.id}
                       className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"

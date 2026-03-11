@@ -77,10 +77,20 @@ npm run dev
 
 ## Google Login
 
-Para ativar o login com Google, preencha no `.env`:
+Para ativar o login com Google:
+
+1. No Google Cloud Console, crie (ou selecione) um projeto.
+2. Vá em **APIs e serviços > Tela de consentimento OAuth** e configure os dados básicos.
+3. Em **Credenciais**, crie um **ID do cliente OAuth 2.0** (tipo **Aplicativo da Web**).
+4. Adicione a URI autorizada de redirecionamento:
+   - `http://localhost:3000/api/auth/callback/google`
+
+5. Copie o Client ID e Client Secret para o `.env` (ou `.env.local`):
 
 - `AUTH_GOOGLE_ID`
 - `AUTH_GOOGLE_SECRET`
+
+Também é aceito o padrão `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`.
 
 Enquanto isso, o projeto também oferece um acesso demo local para facilitar validação e desenvolvimento.
 

@@ -52,10 +52,12 @@ enum PaymentStatus {
 model User {
   id            String       @id @default(cuid())
   name          String?
+  nickname      String?
   email         String?      @unique
   emailVerified DateTime?
   image         String?
   phone         String?
+  pixKey        String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   accounts      Account[]
@@ -88,6 +90,7 @@ model Racha {
   visibility              Visibility     @default(OPEN)
   accessKey               String?
   cancellationWindowHours Int            @default(2)
+  paymentDeadline         DateTime?
   status                  RachaStatus    @default(PUBLISHED)
   // Futebol
   futebolType             String?

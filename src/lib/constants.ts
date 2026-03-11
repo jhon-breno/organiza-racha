@@ -146,10 +146,10 @@ export const participantStatusLabels: Record<string, string> = {
 
 export const paymentStatusLabels: Record<string, string> = {
   PENDING: "Pendente",
-  PROOF_SENT: "PIX informado",
+  PROOF_SENT: "Pagamento em análise",
   PAID: "Pago",
-  REFUND_REQUESTED: "Reembolso solicitado",
-  REFUNDED: "Reembolsado",
+  REFUND_REQUESTED: "Aguardando reembolso",
+  REFUNDED: "Estorno realizado",
 };
 
 /** Tipos de vôlei que suportam levantador fixo (≥ quarteto) */

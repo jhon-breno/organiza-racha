@@ -5,16 +5,21 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { demoAccessSchema } from "@/lib/validations";
 
+const googleClientId =
+  process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret =
+  process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET;
+
 export const isGoogleConfigured = Boolean(
-  process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
+  googleClientId?.trim() && googleClientSecret?.trim(),
 );
 
 const providers = [
   ...(isGoogleConfigured
     ? [
         Google({
-          clientId: process.env.AUTH_GOOGLE_ID!,
-          clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+          clientId: googleClientId!,
+          clientSecret: googleClientSecret!,
         }),
       ]
     : []),

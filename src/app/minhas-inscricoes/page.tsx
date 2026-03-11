@@ -1,13 +1,10 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { cancelEnrollmentAction } from "@/actions";
 import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
+import { MyEnrollmentActions } from "@/components/my-enrollment-actions";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { SubmitButton } from "@/components/submit-button";
-import { participantStatusLabels, paymentStatusLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { formatCurrencyFromCents, formatDateTimeShort } from "@/lib/utils";
 
@@ -15,6 +12,40 @@ type SearchParams = Promise<{
   status?: string;
   message?: string;
 }>;
+
+function getUnifiedEnrollmentStatus(enrollment: {
+  status: string;
+  paymentStatus: string;
+}) {
+  if (
+    enrollment.status === "CANCELED" ||
+    enrollment.paymentStatus === "REFUND_REQUESTED"
+  ) {
+    return {
+      label: "Cancelado",
+      badgeClassName: "bg-rose-100 text-rose-700",
+    };
+  }
+
+  if (enrollment.status === "WAITLIST") {
+    return {
+      label: "Lista de espera",
+      badgeClassName: "bg-slate-100 text-slate-700",
+    };
+  }
+
+  if (enrollment.paymentStatus === "PAID") {
+    return {
+      label: "Confirmado",
+      badgeClassName: "bg-emerald-100 text-emerald-700",
+    };
+  }
+
+  return {
+    label: "Aguardando pagamento",
+    badgeClassName: "bg-amber-100 text-amber-700",
+  };
+}
 
 export default async function MyEnrollmentsPage({
   searchParams,
@@ -29,7 +60,12 @@ export default async function MyEnrollmentsPage({
 
   const params = await searchParams;
   const enrollments = await prisma.enrollment.findMany({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      paymentStatus: {
+        not: "REFUNDED",
+      },
+    },
     include: {
       racha: true,
     },
@@ -63,8 +99,10 @@ export default async function MyEnrollmentsPage({
               enrollment.racha.eventDate.getTime() -
                 enrollment.racha.cancellationWindowHours * 60 * 60 * 1000,
             );
-            const canCancel =
-              new Date() <= deadline && enrollment.status !== "CANCELED";
+            const unifiedStatus = getUnifiedEnrollmentStatus(enrollment);
+            const paymentDeadlineLabel = enrollment.racha.paymentDeadline
+              ? formatDateTimeShort(enrollment.racha.paymentDeadline)
+              : null;
 
             return (
               <Card key={enrollment.id} className="space-y-4">
@@ -84,13 +122,8 @@ export default async function MyEnrollmentsPage({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Badge>
-                      {participantStatusLabels[enrollment.status] ??
-                        enrollment.status}
-                    </Badge>
-                    <Badge className="bg-slate-100 text-slate-700">
-                      {paymentStatusLabels[enrollment.paymentStatus] ??
-                        enrollment.paymentStatus}
+                    <Badge className={unifiedStatus.badgeClassName}>
+                      {unifiedStatus.label}
                     </Badge>
                   </div>
                 </div>
@@ -101,33 +134,19 @@ export default async function MyEnrollmentsPage({
                   <p>
                     Prazo de desistência: {deadline.toLocaleString("pt-BR")}
                   </p>
-                  <p>PIX informado: {enrollment.pixPaid ? "Sim" : "Não"}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    asChild
-                    href={`/rachas/${enrollment.racha.slug}`}
-                    variant="outline"
-                  >
-                    Ver racha
-                  </Button>
-                  {canCancel ? (
-                    <form action={cancelEnrollmentAction}>
-                      <input
-                        name="enrollmentId"
-                        type="hidden"
-                        value={enrollment.id}
-                      />
-                      <SubmitButton
-                        pendingLabel="Cancelando..."
-                        variant="danger"
-                      >
-                        Desistir e pedir reembolso
-                      </SubmitButton>
-                    </form>
+                  {paymentDeadlineLabel ? (
+                    <p>Prazo para pagamento: {paymentDeadlineLabel}</p>
                   ) : null}
                 </div>
+
+                <MyEnrollmentActions
+                  enrollmentId={enrollment.id}
+                  enrollmentStatus={enrollment.status}
+                  paymentStatus={enrollment.paymentStatus}
+                  paymentDeadline={paymentDeadlineLabel}
+                  pixKey={enrollment.racha.pixKey}
+                  rachaSlug={enrollment.racha.slug}
+                />
               </Card>
             );
           })}

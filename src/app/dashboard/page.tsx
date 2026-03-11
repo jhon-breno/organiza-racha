@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
-import { deleteRachaAction } from "@/actions";
+import { updateOrganizerDataSettingsAction } from "@/actions";
+import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/submit-button";
 import { modalityLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +31,39 @@ export default async function DashboardPage({
   }
 
   const params = await searchParams;
+
+  const userModel = Prisma.dmmf.datamodel.models.find(
+    (model) => model.name === "User",
+  );
+  const supportsNickname = Boolean(
+    userModel?.fields.some((field) => field.name === "nickname"),
+  );
+  const supportsPixKey = Boolean(
+    userModel?.fields.some((field) => field.name === "pixKey"),
+  );
+
+  const organizerSelect: Record<string, boolean> = {
+    email: true,
+    name: true,
+    phone: true,
+  };
+
+  if (supportsNickname) {
+    organizerSelect.nickname = true;
+  }
+
+  if (supportsPixKey) {
+    organizerSelect.pixKey = true;
+  }
+
+  const organizerProfile = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: organizerSelect,
+  });
+
+  if (!organizerProfile) {
+    redirect("/auth/signin?callbackUrl=/dashboard");
+  }
 
   const rachas = await prisma.racha.findMany({
     where: { organizerId: session.user.id },
@@ -69,6 +105,65 @@ export default async function DashboardPage({
       </div>
 
       <FlashMessage status={params.status} message={params.message} />
+
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-950">
+            Configurações de dados
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Defina os dados padrão do organizador para agilizar a criação dos
+            próximos rachas.
+          </p>
+        </div>
+
+        <form
+          action={updateOrganizerDataSettingsAction}
+          className="grid gap-4 md:grid-cols-2"
+        >
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Apelido (opcional)
+            <Input
+              defaultValue={organizerProfile.nickname ?? ""}
+              name="nickname"
+              placeholder={organizerProfile.name ?? "Seu apelido"}
+            />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Telefone
+            <Input
+              defaultValue={organizerProfile.phone ?? ""}
+              name="phone"
+              placeholder="5585999999999"
+            />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Chave PIX
+            <Input
+              defaultValue={organizerProfile.pixKey ?? ""}
+              name="pixKey"
+              placeholder="CPF, e-mail, telefone ou chave aleatória"
+            />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            E-mail (Google)
+            <Input
+              defaultValue={organizerProfile.email ?? ""}
+              disabled
+              readOnly
+            />
+          </label>
+
+          <div className="md:col-span-2">
+            <SubmitButton pendingLabel="Salvando...">
+              Salvar configurações
+            </SubmitButton>
+          </div>
+        </form>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -169,12 +264,12 @@ export default async function DashboardPage({
                   </div>
                 </div>
 
-                <form action={deleteRachaAction}>
-                  <input name="id" type="hidden" value={racha.id} />
-                  <SubmitButton pendingLabel="Removendo..." variant="danger">
-                    Remover racha
-                  </SubmitButton>
-                </form>
+                <DeleteRachaDialog
+                  enrollments={racha.enrollments}
+                  rachaId={racha.id}
+                  rachaPixKey={racha.pixKey}
+                  rachaTitle={racha.title}
+                />
               </Card>
             );
           })}

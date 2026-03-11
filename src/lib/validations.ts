@@ -18,6 +18,8 @@ export const rachaFormSchema = z
       .max(200, "Limite máximo de 200 atletas."),
     eventDate: z.string().min(1, "Informe a data do racha."),
     eventTime: z.string().min(1, "Informe o horário do racha."),
+    paymentDeadlineDate: z.string().optional().or(z.literal("")),
+    paymentDeadlineTime: z.string().optional().or(z.literal("")),
     locationName: z.string().min(3, "Informe o nome do local."),
     address: z.string().min(5, "Informe o endereço completo."),
     city: z.string().min(2, "Informe a cidade."),
@@ -86,6 +88,8 @@ export const rachaFormSchema = z
     }
 
     const eventDateTime = new Date(`${data.eventDate}T${data.eventTime}:00`);
+    const hasPaymentDeadlineDate = Boolean(data.paymentDeadlineDate?.trim());
+    const hasPaymentDeadlineTime = Boolean(data.paymentDeadlineTime?.trim());
 
     if (!Number.isNaN(eventDateTime.getTime()) && eventDateTime <= new Date()) {
       ctx.addIssue({
@@ -93,6 +97,50 @@ export const rachaFormSchema = z
         path: ["eventDate"],
         message: "A data e o horário do racha devem estar no futuro.",
       });
+    }
+
+    if (hasPaymentDeadlineDate !== hasPaymentDeadlineTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["paymentDeadlineDate"],
+        message: "Informe data e horário do prazo de pagamento.",
+      });
+      return;
+    }
+
+    if (hasPaymentDeadlineDate && hasPaymentDeadlineTime) {
+      const paymentDeadline = new Date(
+        `${data.paymentDeadlineDate}T${data.paymentDeadlineTime}:00`,
+      );
+
+      if (Number.isNaN(paymentDeadline.getTime())) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["paymentDeadlineDate"],
+          message: "Prazo de pagamento inválido.",
+        });
+        return;
+      }
+
+      if (paymentDeadline <= new Date()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["paymentDeadlineDate"],
+          message: "O prazo de pagamento deve estar no futuro.",
+        });
+      }
+
+      if (
+        !Number.isNaN(eventDateTime.getTime()) &&
+        paymentDeadline >= eventDateTime
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["paymentDeadlineDate"],
+          message:
+            "O prazo de pagamento precisa ser antes da data e horário do racha.",
+        });
+      }
     }
   });
 
@@ -111,16 +159,61 @@ export const enrollmentSchema = z.object({
   acceptedRules: z.coerce
     .boolean()
     .refine((value) => value, "Você deve aceitar as regras."),
-  pixPaid: z.coerce
+  paymentCommitment: z.coerce
     .boolean()
-    .refine((value) => value, "Confirme que realizou o pagamento via PIX."),
+    .refine(
+      (value) => value,
+      "Confirme que só estará na lista após realizar o pagamento.",
+    ),
   accessKey: z.string().optional().or(z.literal("")),
+});
+
+export const refundRequestSchema = z.object({
+  enrollmentId: z.string().min(1, "Inscrição inválida."),
+  refundReason: z.string().min(3, "Informe o motivo do reembolso."),
+  refundPixKey: z.string().min(3, "Informe a chave PIX para devolução."),
+  confirmCancellation: z.coerce
+    .boolean()
+    .refine((value) => value, "Confirme que deseja cancelar a inscrição."),
+  confirmationText: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "CANCELAR",
+      'Digite "CANCELAR" para confirmar a solicitação de reembolso.',
+    ),
+});
+
+export const cancelPendingEnrollmentSchema = z.object({
+  enrollmentId: z.string().min(1, "Inscrição inválida."),
+  confirmCancellation: z.coerce
+    .boolean()
+    .refine((value) => value, "Confirme que deseja cancelar a inscrição."),
+  cancelReason: z.string().trim().min(3, "Informe o motivo do cancelamento."),
 });
 
 export const demoAccessSchema = z.object({
   name: z.string().min(2, "Informe seu nome."),
   email: z.string().email("Informe um e-mail válido."),
   callbackUrl: z.string().optional().or(z.literal("")),
+});
+
+export const organizerDataSettingsSchema = z.object({
+  nickname: z
+    .string()
+    .max(60, "O apelido pode ter no máximo 60 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  phone: z
+    .string()
+    .min(8, "Informe um telefone válido.")
+    .optional()
+    .or(z.literal("")),
+  pixKey: z
+    .string()
+    .min(3, "Informe uma chave PIX válida.")
+    .optional()
+    .or(z.literal("")),
 });
 
 export function combineDateAndTime(date: string, time: string) {

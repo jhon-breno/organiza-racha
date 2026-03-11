@@ -1,15 +1,23 @@
 "use server";
 
-import { PaymentStatus, ParticipantStatus, Visibility } from "@prisma/client";
+import {
+  PaymentStatus,
+  ParticipantStatus,
+  Prisma,
+  Visibility,
+} from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured, signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
+  cancelPendingEnrollmentSchema,
   combineDateAndTime,
   demoAccessSchema,
   enrollmentSchema,
+  organizerDataSettingsSchema,
+  refundRequestSchema,
   rachaFormSchema,
 } from "@/lib/validations";
 import {
@@ -26,6 +34,14 @@ function getStringValue(formData: FormData, key: string) {
 function getFirstIssueFieldName(issues: { path: PropertyKey[] }[]) {
   const firstPathEntry = issues[0]?.path?.[0];
   return typeof firstPathEntry === "string" ? firstPathEntry : undefined;
+}
+
+function supportsUserField(fieldName: string) {
+  const userModel = Prisma.dmmf.datamodel.models.find(
+    (model) => model.name === "User",
+  );
+
+  return Boolean(userModel?.fields.some((field) => field.name === fieldName));
 }
 
 type ValidatePrivateAccessKeyState = {
@@ -171,6 +187,58 @@ export async function signOutAction() {
   await signOut({ redirectTo: "/" });
 }
 
+export async function updateOrganizerDataSettingsAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerDataSettingsSchema.safeParse({
+    nickname: getStringValue(formData, "nickname"),
+    phone: getStringValue(formData, "phone"),
+    pixKey: getStringValue(formData, "pixKey"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível atualizar suas configurações.",
+      ),
+    );
+  }
+
+  const canUseNickname = supportsUserField("nickname");
+  const canUsePixKey = supportsUserField("pixKey");
+
+  const updateData: Record<string, string | null> = {
+    phone: parsed.data.phone || null,
+  };
+
+  if (canUseNickname) {
+    updateData.nickname = parsed.data.nickname || null;
+  }
+
+  if (canUsePixKey) {
+    updateData.pixKey = parsed.data.pixKey || null;
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: updateData,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/rachas/new");
+
+  redirect(
+    buildMessageUrl(
+      "/dashboard",
+      "success",
+      "Configurações de dados atualizadas com sucesso.",
+    ),
+  );
+}
+
 export async function createRachaAction(formData: FormData) {
   const user = await requireUser("/dashboard/rachas/new");
 
@@ -182,6 +250,8 @@ export async function createRachaAction(formData: FormData) {
     athleteLimit: getStringValue(formData, "athleteLimit"),
     eventDate: getStringValue(formData, "eventDate"),
     eventTime: getStringValue(formData, "eventTime"),
+    paymentDeadlineDate: getStringValue(formData, "paymentDeadlineDate"),
+    paymentDeadlineTime: getStringValue(formData, "paymentDeadlineTime"),
     locationName: getStringValue(formData, "locationName"),
     address: getStringValue(formData, "address"),
     city: getStringValue(formData, "city"),
@@ -223,12 +293,28 @@ export async function createRachaAction(formData: FormData) {
     parsed.data.eventDate,
     parsed.data.eventTime,
   );
+  const paymentDeadline =
+    parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
+      ? combineDateAndTime(
+          parsed.data.paymentDeadlineDate,
+          parsed.data.paymentDeadlineTime,
+        )
+      : null;
   const slug = await generateUniqueSlug(parsed.data.title);
+
+  const canUsePixKey = supportsUserField("pixKey");
+  const userDataToUpdate: Record<string, string> = {
+    phone: parsed.data.phoneWhatsapp,
+  };
+
+  if (canUsePixKey) {
+    userDataToUpdate.pixKey = parsed.data.pixKey;
+  }
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      phone: parsed.data.phoneWhatsapp,
+      ...userDataToUpdate,
       name: user.name ?? parsed.data.organizerDisplayName,
     },
   });
@@ -262,6 +348,7 @@ export async function createRachaAction(formData: FormData) {
           ? parsed.data.accessKey || null
           : null,
       cancellationWindowHours: parsed.data.cancellationWindowHours,
+      paymentDeadline,
       futebolType: parsed.data.futebolType || null,
       goalkeeperLimit: parsed.data.goalkeeperLimit || null,
       voleiType: parsed.data.voleiType || null,
@@ -298,6 +385,8 @@ export async function updateRachaAction(formData: FormData) {
     athleteLimit: getStringValue(formData, "athleteLimit"),
     eventDate: getStringValue(formData, "eventDate"),
     eventTime: getStringValue(formData, "eventTime"),
+    paymentDeadlineDate: getStringValue(formData, "paymentDeadlineDate"),
+    paymentDeadlineTime: getStringValue(formData, "paymentDeadlineTime"),
     locationName: getStringValue(formData, "locationName"),
     address: getStringValue(formData, "address"),
     city: getStringValue(formData, "city"),
@@ -340,7 +429,28 @@ export async function updateRachaAction(formData: FormData) {
     parsed.data.eventDate,
     parsed.data.eventTime,
   );
+  const paymentDeadline =
+    parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
+      ? combineDateAndTime(
+          parsed.data.paymentDeadlineDate,
+          parsed.data.paymentDeadlineTime,
+        )
+      : null;
   const slug = await generateUniqueSlug(parsed.data.title, id);
+
+  const canUsePixKey = supportsUserField("pixKey");
+  const userDataToUpdate: Record<string, string> = {
+    phone: parsed.data.phoneWhatsapp,
+  };
+
+  if (canUsePixKey) {
+    userDataToUpdate.pixKey = parsed.data.pixKey;
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: userDataToUpdate,
+  });
 
   await prisma.racha.update({
     where: { id },
@@ -372,6 +482,7 @@ export async function updateRachaAction(formData: FormData) {
           ? parsed.data.accessKey || null
           : null,
       cancellationWindowHours: parsed.data.cancellationWindowHours,
+      paymentDeadline,
       futebolType: parsed.data.futebolType || null,
       goalkeeperLimit: parsed.data.goalkeeperLimit || null,
       voleiType: parsed.data.voleiType || null,
@@ -397,6 +508,17 @@ export async function updateRachaAction(formData: FormData) {
 export async function deleteRachaAction(formData: FormData) {
   const user = await requireUser("/dashboard");
   const id = getStringValue(formData, "id");
+  const confirmDelete = getStringValue(formData, "confirmDelete");
+
+  if (confirmDelete !== "true") {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        "Confirme a remoção do racha antes de continuar.",
+      ),
+    );
+  }
 
   const existing = await prisma.racha.findUnique({ where: { id } });
 
@@ -428,7 +550,7 @@ export async function joinRachaAction(formData: FormData) {
     participantLevel: getStringValue(formData, "participantLevel"),
     notes: getStringValue(formData, "notes"),
     acceptedRules: formData.get("acceptedRules") === "on",
-    pixPaid: formData.get("pixPaid") === "on",
+    paymentCommitment: formData.get("paymentCommitment") === "on",
     accessKey: getStringValue(formData, "accessKey"),
   });
 
@@ -444,6 +566,31 @@ export async function joinRachaAction(formData: FormData) {
   }
 
   const racha = await prisma.racha.findUnique({ where: { id: rachaId } });
+  if (racha.paymentDeadline && new Date() > racha.paymentDeadline) {
+    await prisma.enrollment.updateMany({
+      where: {
+        rachaId,
+        status: {
+          not: ParticipantStatus.CANCELED,
+        },
+        paymentStatus: {
+          in: [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT],
+        },
+      },
+      data: {
+        status: ParticipantStatus.CANCELED,
+        canceledAt: new Date(),
+      },
+    });
+
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "O prazo de pagamento deste racha já foi encerrado.",
+      ),
+    );
+  }
 
   if (!racha) {
     redirect(buildMessageUrl("/", "error", "Racha não encontrado."));
@@ -539,6 +686,16 @@ export async function joinRachaAction(formData: FormData) {
     );
   }
 
+  if (existing?.paymentStatus === PaymentStatus.REFUND_REQUESTED) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Você tem um reembolso em andamento. Aguarde o estorno para se inscrever novamente.",
+      ),
+    );
+  }
+
   const confirmedCount = await prisma.enrollment.count({
     where: {
       rachaId,
@@ -560,10 +717,10 @@ export async function joinRachaAction(formData: FormData) {
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
         acceptedRules: true,
-        pixPaid: true,
+        pixPaid: false,
         notes: parsed.data.notes || null,
         status: nextStatus,
-        paymentStatus: PaymentStatus.PROOF_SENT,
+        paymentStatus: PaymentStatus.PENDING,
         canceledAt: null,
         refundRequestedAt: null,
       },
@@ -578,10 +735,10 @@ export async function joinRachaAction(formData: FormData) {
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
         acceptedRules: true,
-        pixPaid: true,
+        pixPaid: false,
         notes: parsed.data.notes || null,
         status: nextStatus,
-        paymentStatus: PaymentStatus.PROOF_SENT,
+        paymentStatus: PaymentStatus.PENDING,
       },
     });
   }
@@ -592,18 +749,37 @@ export async function joinRachaAction(formData: FormData) {
 
   redirect(
     buildMessageUrl(
-      callbackUrl,
+      "/minhas-inscricoes",
       "success",
       nextStatus === ParticipantStatus.WAITLIST
-        ? "Você entrou na lista de espera. O organizador poderá te chamar se surgir vaga."
-        : "Inscrição registrada com sucesso.",
+        ? "Inscrição registrada na lista de espera. Acompanhe em Minhas inscrições."
+        : "Inscrição registrada com sucesso. Realize o pagamento para seguir no racha.",
     ),
   );
 }
 
 export async function cancelEnrollmentAction(formData: FormData) {
   const user = await requireUser("/minhas-inscricoes");
-  const enrollmentId = getStringValue(formData, "enrollmentId");
+  const parsed = refundRequestSchema.safeParse({
+    enrollmentId: getStringValue(formData, "enrollmentId"),
+    refundReason: getStringValue(formData, "refundReason"),
+    refundPixKey: getStringValue(formData, "refundPixKey"),
+    confirmCancellation: formData.get("confirmCancellation") === "on",
+    confirmationText: getStringValue(formData, "confirmationText"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/minhas-inscricoes",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível solicitar o reembolso.",
+      ),
+    );
+  }
+
+  const enrollmentId = parsed.data.enrollmentId;
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
@@ -635,6 +811,18 @@ export async function cancelEnrollmentAction(formData: FormData) {
     );
   }
 
+  if (enrollment.paymentStatus !== PaymentStatus.PAID) {
+    redirect(
+      buildMessageUrl(
+        "/minhas-inscricoes",
+        "error",
+        "A solicitação de reembolso só pode ser feita após confirmação do pagamento.",
+      ),
+    );
+  }
+
+  const refundMetadata = `\n\n[Reembolso solicitado]\nMotivo: ${parsed.data.refundReason}\nPIX para devolução: ${parsed.data.refundPixKey}`;
+
   await prisma.enrollment.update({
     where: { id: enrollmentId },
     data: {
@@ -642,6 +830,7 @@ export async function cancelEnrollmentAction(formData: FormData) {
       paymentStatus: PaymentStatus.REFUND_REQUESTED,
       canceledAt: new Date(),
       refundRequestedAt: new Date(),
+      notes: `${enrollment.notes ?? ""}${refundMetadata}`.trim(),
     },
   });
 
@@ -654,6 +843,73 @@ export async function cancelEnrollmentAction(formData: FormData) {
       "/minhas-inscricoes",
       "success",
       "Desistência registrada e pedido de reembolso enviado ao organizador.",
+    ),
+  );
+}
+
+export async function cancelPendingEnrollmentAction(formData: FormData) {
+  const user = await requireUser("/minhas-inscricoes");
+
+  const parsed = cancelPendingEnrollmentSchema.safeParse({
+    enrollmentId: getStringValue(formData, "enrollmentId"),
+    confirmCancellation: formData.get("confirmCancellation") === "on",
+    cancelReason: getStringValue(formData, "cancelReason"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/minhas-inscricoes",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível cancelar a inscrição.",
+      ),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: parsed.data.enrollmentId },
+  });
+
+  if (!enrollment || enrollment.userId !== user.id) {
+    redirect(
+      buildMessageUrl(
+        "/minhas-inscricoes",
+        "error",
+        "Inscrição não encontrada para cancelamento.",
+      ),
+    );
+  }
+
+  if (enrollment.paymentStatus === PaymentStatus.PAID) {
+    redirect(
+      buildMessageUrl(
+        "/minhas-inscricoes",
+        "error",
+        "Para inscrições pagas, use a solicitação de reembolso.",
+      ),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      status: ParticipantStatus.CANCELED,
+      canceledAt: new Date(),
+      notes:
+        `${enrollment.notes ?? ""}\n\n[Cancelamento sem pagamento]\nMotivo: ${parsed.data.cancelReason}`.trim(),
+    },
+  });
+
+  revalidatePath("/minhas-inscricoes");
+  revalidatePath(`/rachas/${enrollment.rachaId}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      "/minhas-inscricoes",
+      "success",
+      "Inscrição cancelada com sucesso.",
     ),
   );
 }
@@ -673,10 +929,21 @@ export async function confirmEnrollmentPaymentAction(formData: FormData) {
     );
   }
 
+  if (enrollment.status === ParticipantStatus.CANCELED) {
+    redirect(
+      buildMessageUrl(
+        `/dashboard/rachas/${enrollment.rachaId}/edit`,
+        "error",
+        "Não é possível confirmar pagamento de inscrição cancelada.",
+      ),
+    );
+  }
+
   await prisma.enrollment.update({
     where: { id: enrollmentId },
     data: {
       paymentStatus: PaymentStatus.PAID,
+      pixPaid: true,
     },
   });
 
@@ -709,11 +976,14 @@ export async function markEnrollmentRefundedAction(formData: FormData) {
   await prisma.enrollment.update({
     where: { id: enrollmentId },
     data: {
+      status: ParticipantStatus.CANCELED,
       paymentStatus: PaymentStatus.REFUNDED,
     },
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/minhas-inscricoes");
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
   revalidatePath(`/dashboard/rachas/${enrollment.rachaId}/edit`);
   redirect(
     buildMessageUrl(

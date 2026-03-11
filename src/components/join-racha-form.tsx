@@ -82,7 +82,7 @@ export function JoinRachaForm({
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {isPrivateRacha
             ? "Racha privado: confirme a chave secreta para liberar o formulário de inscrição."
-            : "Informe seus dados, confirme o PIX do organizador e aceite as regras para garantir sua vaga."}
+            : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições."}
         </p>
       </div>
 
@@ -189,12 +189,11 @@ export function JoinRachaForm({
           <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <input
               className="mt-1 h-4 w-4 rounded border-slate-300"
-              name="pixPaid"
+              name="paymentCommitment"
               type="checkbox"
             />
             <span>
-              Confirmo que realizei o pagamento via PIX com a chave informada
-              acima.
+              Confirmo que só estarei na lista quando realizar o pagamento.
             </span>
           </label>
 
@@ -212,9 +211,9 @@ export function JoinRachaForm({
 
           <SubmitButton
             className="w-full"
-            pendingLabel="Confirmando inscrição..."
+            pendingLabel="Solicitando participação..."
           >
-            Confirmar participação
+            Solicitar participação
           </SubmitButton>
         </form>
       ) : null}
