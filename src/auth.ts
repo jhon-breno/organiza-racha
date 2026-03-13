@@ -1,9 +1,10 @@
 import NextAuth from "next-auth";
+import { compare } from "bcryptjs";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import { demoAccessSchema } from "@/lib/validations";
+import { credentialsSignInSchema } from "@/lib/validations";
 
 const googleClientId = (
   process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID
@@ -13,6 +14,10 @@ const googleClientSecret = (
 )?.trim();
 
 export const isGoogleConfigured = Boolean(googleClientId && googleClientSecret);
+
+function normalizePhoneIdentifier(value: string) {
+  return value.replace(/\D/g, "");
+}
 
 const providers = [
   ...(isGoogleConfigured
@@ -24,42 +29,47 @@ const providers = [
       ]
     : []),
   Credentials({
-    name: "Acesso demo",
+    name: "E-mail/Telefone e senha",
     credentials: {
-      name: { label: "Nome", type: "text" },
-      email: { label: "Email", type: "email" },
+      identifier: { label: "E-mail ou telefone", type: "text" },
+      password: { label: "Senha", type: "password" },
       callbackUrl: { label: "Callback", type: "text" },
     },
     async authorize(credentials) {
-      const parsed = demoAccessSchema.safeParse(credentials);
+      const parsed = credentialsSignInSchema.safeParse(credentials);
 
       if (!parsed.success) {
         return null;
       }
 
-      const existingUser = await prisma.user.findUnique({
-        where: { email: parsed.data.email },
-      });
+      const normalizedIdentifier = parsed.data.identifier.trim();
+      const isEmail = normalizedIdentifier.includes("@");
 
-      const user = existingUser
-        ? await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              emailVerified: new Date(),
-              ...(existingUser.name
-                ? {}
-                : {
-                    name: parsed.data.name,
-                  }),
-            },
+      const user = isEmail
+        ? await prisma.user.findUnique({
+            where: { email: normalizedIdentifier.toLowerCase() },
           })
-        : await prisma.user.create({
-            data: {
-              name: parsed.data.name,
-              email: parsed.data.email,
-              emailVerified: new Date(),
+        : await prisma.user.findFirst({
+            where: {
+              OR: [
+                { phone: normalizedIdentifier },
+                { phone: normalizePhoneIdentifier(normalizedIdentifier) },
+              ],
             },
           });
+
+      if (!user?.passwordHash) {
+        return null;
+      }
+
+      const passwordMatches = await compare(
+        parsed.data.password,
+        user.passwordHash,
+      );
+
+      if (!passwordMatches) {
+        return null;
+      }
 
       return {
         id: user.id,

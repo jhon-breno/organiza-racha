@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { modalities } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
+import { normalizeSearchText } from "@/lib/utils";
 
 type SearchParams = Promise<{
   q?: string;
@@ -24,27 +25,16 @@ export default async function Home({
   const params = await searchParams;
   const session = await auth();
   const q = params.q?.trim() ?? "";
+  const normalizedQuery = normalizeSearchText(q);
   const modality = params.modality?.trim() ?? "";
   const visibility = params.visibility?.trim() ?? "";
 
-  const rachas = await prisma.racha.findMany({
+  const allMatchingRachas = await prisma.racha.findMany({
     where: {
       status: "PUBLISHED",
       eventDate: { gte: new Date() },
       ...(modality ? { modality: modality as never } : {}),
       ...(visibility ? { visibility: visibility as never } : {}),
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q } },
-              { city: { contains: q } },
-              { address: { contains: q } },
-              { locationName: { contains: q } },
-              { organizerDisplayName: { contains: q } },
-              { phoneWhatsapp: { contains: q } },
-            ],
-          }
-        : {}),
     },
     include: {
       organizer: true,
@@ -55,6 +45,23 @@ export default async function Home({
     },
     orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }],
   });
+
+  const rachas = normalizedQuery
+    ? allMatchingRachas.filter((racha) => {
+        const searchTargets = [
+          racha.title,
+          racha.city,
+          racha.address,
+          racha.locationName,
+          racha.organizerDisplayName,
+          racha.phoneWhatsapp,
+        ];
+
+        return searchTargets.some((target) =>
+          normalizeSearchText(target).includes(normalizedQuery),
+        );
+      })
+    : allMatchingRachas;
 
   const [totalRachas, totalOrganizadores, totalInscricoes] = await Promise.all([
     prisma.racha.count({ where: { status: "PUBLISHED" } }),

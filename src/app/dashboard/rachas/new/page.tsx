@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { FlashMessage } from "@/components/flash-message";
 import { RachaForm } from "@/components/racha-form";
-import { prisma } from "@/lib/prisma";
 
 type SearchParams = Promise<{
   status?: string;
@@ -22,50 +20,6 @@ export default async function NewRachaPage({
   }
 
   const params = await searchParams;
-  const userModel = Prisma.dmmf.datamodel.models.find(
-    (model) => model.name === "User",
-  );
-  const supportsNickname = Boolean(
-    userModel?.fields.some((field) => field.name === "nickname"),
-  );
-  const supportsPixKey = Boolean(
-    userModel?.fields.some((field) => field.name === "pixKey"),
-  );
-
-  const organizerSelect: Record<string, boolean> = {
-    name: true,
-    phone: true,
-  };
-
-  if (supportsNickname) {
-    organizerSelect.nickname = true;
-  }
-
-  if (supportsPixKey) {
-    organizerSelect.pixKey = true;
-  }
-
-  const organizerProfile = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: organizerSelect,
-  });
-
-  const organizerNickname =
-    organizerProfile && typeof organizerProfile.nickname === "string"
-      ? organizerProfile.nickname
-      : "";
-  const organizerName =
-    organizerProfile && typeof organizerProfile.name === "string"
-      ? organizerProfile.name
-      : "";
-  const organizerPhone =
-    organizerProfile && typeof organizerProfile.phone === "string"
-      ? organizerProfile.phone
-      : "";
-  const organizerPixKey =
-    organizerProfile && typeof organizerProfile.pixKey === "string"
-      ? organizerProfile.pixKey
-      : "";
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -78,13 +32,7 @@ export default async function NewRachaPage({
         </h1>
       </div>
       <FlashMessage status={params.status} message={params.message} />
-      <RachaForm
-        defaultValues={{
-          organizerDisplayName: organizerNickname || organizerName,
-          phoneWhatsapp: organizerPhone,
-          pixKey: organizerPixKey,
-        }}
-      />
+      <RachaForm />
     </div>
   );
 }

@@ -57,8 +57,13 @@ model User {
   email         String?      @unique
   emailVerified DateTime?
   image         String?
-  phone         String?
+  phone         String?      @unique
+  passwordHash  String?
+  passwordResetToken   String? @unique
+  passwordResetExpires DateTime?
   pixKey        String?
+  pixBankName   String?
+  pixHolderName String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   accounts      Account[]

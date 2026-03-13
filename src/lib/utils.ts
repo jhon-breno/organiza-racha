@@ -20,6 +20,36 @@ export function slugify(value: string) {
   return slug || "racha";
 }
 
+export function normalizeSearchText(value?: string | null) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+export function formatPhoneInput(value?: string | null) {
+  const rawDigits = (value ?? "").replace(/\D/g, "");
+  const digits =
+    rawDigits.length > 11 && rawDigits.startsWith("55")
+      ? rawDigits.slice(2, 13)
+      : rawDigits.slice(0, 11);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  if (digits.length <= 3) {
+    return `${digits.slice(0, 2)} ${digits.slice(2)}`;
+  }
+
+  if (digits.length <= 7) {
+    return `${digits.slice(0, 2)} ${digits.slice(2, 3)} ${digits.slice(3)}`;
+  }
+
+  return `${digits.slice(0, 2)} ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 export function formatCurrencyFromCents(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",

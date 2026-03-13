@@ -33,10 +33,7 @@ type RachaFormValues = {
   state?: string | null;
   mapsQuery?: string | null;
   priceInCents?: number;
-  organizerDisplayName?: string;
-  phoneWhatsapp?: string;
   whatsappGroupUrl?: string | null;
-  pixKey?: string;
   coverImageUrl?: string | null;
   profileImageUrl?: string | null;
   visibility?: string;
@@ -555,37 +552,16 @@ export function RachaForm({
 
       <Card className="space-y-6">
         <div>
-          <h3 className="text-xl font-bold text-slate-950">
-            Organizador e pagamento
-          </h3>
+          <h3 className="text-xl font-bold text-slate-950">Mídia e acesso</h3>
           <p className="mt-1 text-sm text-slate-600">
-            Dados usados para contato, ingresso no grupo e conferência manual do
-            PIX.
+            As imagens são opcionais. Os dados do organizador e do PIX vêm do
+            painel administrativo; aqui você só define o que é específico deste
+            racha.
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Nome do organizador
-            <Input
-              defaultValue={defaultValues?.organizerDisplayName}
-              name="organizerDisplayName"
-              placeholder="Seu nome público no racha"
-              required
-            />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            WhatsApp
-            <Input
-              defaultValue={defaultValues?.phoneWhatsapp}
-              name="phoneWhatsapp"
-              placeholder="11999999999"
-              required
-            />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
+          <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
             Link do grupo do WhatsApp
             <Input
               defaultValue={defaultValues?.whatsappGroupUrl ?? ""}
@@ -594,29 +570,6 @@ export function RachaForm({
             />
           </label>
 
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Chave PIX
-            <Input
-              defaultValue={defaultValues?.pixKey}
-              name="pixKey"
-              placeholder="CPF, e-mail, telefone ou chave aleatória"
-              required
-            />
-          </label>
-        </div>
-      </Card>
-
-      <Card className="space-y-6">
-        <div>
-          <h3 className="text-xl font-bold text-slate-950">Mídia e acesso</h3>
-          <p className="mt-1 text-sm text-slate-600">
-            As imagens são opcionais: sem capa, usamos uma capa padrão da
-            modalidade; sem foto de perfil, usamos a foto do login Google (ou
-            iniciais do nome).
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-2 text-sm font-medium text-slate-700">
             URL da capa
             <Input

@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+function isEmailValue(value: string) {
+  return z.string().email().safeParse(value).success;
+}
+
+function isPhoneValue(value: string) {
+  return value.replace(/\D/g, "").length >= 8;
+}
+
 export const rachaFormSchema = z
   .object({
     id: z.string().optional(),
@@ -30,15 +38,12 @@ export const rachaFormSchema = z
       .or(z.literal("")),
     mapsQuery: z.string().optional().or(z.literal("")),
     price: z.coerce.number().min(0, "O valor deve ser maior ou igual a zero."),
-    organizerDisplayName: z.string().min(2, "Informe o nome do organizador."),
-    phoneWhatsapp: z.string().min(8, "Informe um WhatsApp válido."),
     whatsappGroupUrl: z
       .union([
         z.literal(""),
         z.string().url("Informe um link válido para o grupo do WhatsApp."),
       ])
       .optional(),
-    pixKey: z.string().min(3, "Informe a chave PIX."),
     coverImageUrl: z
       .union([
         z.literal(""),
@@ -211,6 +216,89 @@ export const demoAccessSchema = z.object({
   callbackUrl: z.string().optional().or(z.literal("")),
 });
 
+export const credentialsSignInSchema = z.object({
+  identifier: z.string().trim().min(3, "Informe e-mail ou telefone."),
+  password: z.string().min(6, "Informe sua senha."),
+  callbackUrl: z.string().optional().or(z.literal("")),
+});
+
+export const signUpSchema = z
+  .object({
+    name: z.string().trim().min(2, "Informe seu nome."),
+    email: z.string().trim().optional().or(z.literal("")),
+    phone: z.string().trim().optional().or(z.literal("")),
+    password: z
+      .string()
+      .min(6, "A senha deve ter pelo menos 6 caracteres.")
+      .max(72, "A senha deve ter no máximo 72 caracteres."),
+    confirmPassword: z.string().min(1, "Confirme sua senha."),
+    callbackUrl: z.string().optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    const hasEmail = Boolean(data.email?.trim());
+    const hasPhone = Boolean(data.phone?.trim());
+
+    if (!hasEmail && !hasPhone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Informe e-mail ou telefone para criar a conta.",
+      });
+    }
+
+    if (hasEmail && !isEmailValue(data.email!)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Informe um e-mail válido.",
+      });
+    }
+
+    if (hasPhone && !isPhoneValue(data.phone!)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone"],
+        message: "Informe um telefone válido.",
+      });
+    }
+
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "As senhas não conferem.",
+      });
+    }
+  });
+
+export const forgotPasswordSchema = z.object({
+  identifier: z.string().trim().min(3, "Informe e-mail ou telefone."),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().trim().min(12, "Token de recuperação inválido."),
+    password: z
+      .string()
+      .min(6, "A senha deve ter pelo menos 6 caracteres.")
+      .max(72, "A senha deve ter no máximo 72 caracteres."),
+    confirmPassword: z.string().min(1, "Confirme sua senha."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "As senhas não conferem.",
+      });
+    }
+  });
+
+export const recoverIdentifierSchema = z.object({
+  name: z.string().trim().min(2, "Informe seu nome."),
+  knownIdentifier: z.string().trim().min(3, "Informe e-mail ou telefone."),
+});
+
 export const organizerDataSettingsSchema = z.object({
   nickname: z
     .string()
@@ -222,9 +310,22 @@ export const organizerDataSettingsSchema = z.object({
     .min(8, "Informe um telefone válido.")
     .optional()
     .or(z.literal("")),
+});
+
+export const organizerPixSettingsSchema = z.object({
   pixKey: z
     .string()
     .min(3, "Informe uma chave PIX válida.")
+    .optional()
+    .or(z.literal("")),
+  pixBankName: z
+    .string()
+    .min(2, "Informe o nome do banco.")
+    .optional()
+    .or(z.literal("")),
+  pixHolderName: z
+    .string()
+    .min(3, "Informe o nome completo do titular.")
     .optional()
     .or(z.literal("")),
 });

@@ -6,6 +6,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -113,7 +114,11 @@ export function EnrollmentManagement({
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Telefone
-            <Input name="participantPhone" placeholder="11999999999" required />
+            <PhoneInput
+              name="participantPhone"
+              placeholder="99 9 9999-9999"
+              required
+            />
           </label>
 
           <label className="space-y-2 text-sm font-medium text-slate-700">

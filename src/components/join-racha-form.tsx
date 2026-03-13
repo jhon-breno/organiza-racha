@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -152,10 +153,10 @@ export function JoinRachaForm({
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Telefone
-            <Input
+            <PhoneInput
               defaultValue={defaultParticipantPhone ?? ""}
               name="participantPhone"
-              placeholder="11999999999"
+              placeholder="99 9 9999-9999"
               required
             />
           </label>

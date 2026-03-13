@@ -1,11 +1,14 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+import { hash } from "bcryptjs";
 import {
   PaymentStatus,
   ParticipantStatus,
   Prisma,
   Visibility,
 } from "@prisma/client";
+import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -14,12 +17,17 @@ import { prisma } from "@/lib/prisma";
 import {
   cancelPendingEnrollmentSchema,
   combineDateAndTime,
-  demoAccessSchema,
+  credentialsSignInSchema,
   enrollmentSchema,
+  forgotPasswordSchema,
   organizerEnrollmentSchema,
   organizerDataSettingsSchema,
+  organizerPixSettingsSchema,
+  recoverIdentifierSchema,
+  resetPasswordSchema,
   refundRequestSchema,
   rachaFormSchema,
+  signUpSchema,
 } from "@/lib/validations";
 import {
   buildMessageUrl,
@@ -46,8 +54,62 @@ function supportsUserField(fieldName: string) {
 }
 
 function normalizePhoneValue(phone: string) {
-  const digits = phone.replace(/\D/g, "");
+  const rawDigits = phone.replace(/\D/g, "");
+  const digits =
+    rawDigits.length > 11 && rawDigits.startsWith("55")
+      ? rawDigits.slice(2, 13)
+      : rawDigits.slice(0, 11);
+
   return digits || phone.trim().toLowerCase();
+}
+
+function normalizeEmailValue(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function maskEmail(email: string) {
+  const [localPart, domainPart] = email.split("@");
+
+  if (!localPart || !domainPart) {
+    return email;
+  }
+
+  const visibleLocal =
+    localPart.length <= 2 ? localPart : localPart.slice(0, 2);
+  return `${visibleLocal}${"*".repeat(Math.max(localPart.length - visibleLocal.length, 1))}@${domainPart}`;
+}
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.length <= 4) {
+    return `****${digits}`;
+  }
+
+  return `${digits.slice(0, 2)}*****${digits.slice(-2)}`;
+}
+
+async function getOrganizerRachaSettings(userId: string) {
+  const organizer = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true,
+      nickname: true,
+      phone: true,
+      pixKey: true,
+    },
+  });
+
+  if (!organizer) {
+    return null;
+  }
+
+  return {
+    organizerDisplayName:
+      organizer.nickname?.trim() || organizer.name?.trim() || "",
+    phoneWhatsapp: organizer.phone?.trim() || "",
+    pixKey: organizer.pixKey?.trim() || "",
+  };
 }
 
 async function hasDuplicatedPhoneEnrollment(
@@ -192,30 +254,362 @@ export async function signInWithGoogleAction(formData: FormData) {
   await signIn("google", { redirectTo: callbackUrl });
 }
 
-export async function demoAccessAction(formData: FormData) {
-  const parsed = demoAccessSchema.safeParse({
-    name: getStringValue(formData, "name"),
-    email: getStringValue(formData, "email"),
-    callbackUrl: getStringValue(formData, "callbackUrl"),
+export async function signInWithCredentialsAction(formData: FormData) {
+  const callbackUrl = getStringValue(formData, "callbackUrl") || "/";
+  const parsed = credentialsSignInSchema.safeParse({
+    identifier: getStringValue(formData, "identifier"),
+    password: getStringValue(formData, "password"),
+    callbackUrl,
   });
 
   if (!parsed.success) {
     redirect(
       buildMessageUrl(
-        "/auth/signin",
+        `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
         "error",
-        parsed.error.issues[0]?.message ??
-          "Não foi possível entrar no modo demo.",
+        parsed.error.issues[0]?.message ?? "Não foi possível fazer login.",
       ),
     );
   }
 
-  await signIn("credentials", {
-    name: parsed.data.name,
-    email: parsed.data.email,
-    callbackUrl: parsed.data.callbackUrl,
-    redirectTo: parsed.data.callbackUrl || "/",
+  try {
+    await signIn("credentials", {
+      identifier: parsed.data.identifier,
+      password: parsed.data.password,
+      redirectTo: callbackUrl,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      redirect(
+        buildMessageUrl(
+          `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          "error",
+          "E-mail/telefone ou senha inválidos.",
+        ),
+      );
+    }
+
+    throw error;
+  }
+}
+
+export async function signUpWithPasswordAction(formData: FormData) {
+  const callbackUrl = getStringValue(formData, "callbackUrl") || "/";
+  const parsed = signUpSchema.safeParse({
+    name: getStringValue(formData, "name"),
+    email: getStringValue(formData, "email"),
+    phone: getStringValue(formData, "phone"),
+    password: getStringValue(formData, "password"),
+    confirmPassword: getStringValue(formData, "confirmPassword"),
+    callbackUrl,
   });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        `/auth/signin?tab=signup&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+        "error",
+        parsed.error.issues[0]?.message ?? "Não foi possível criar a conta.",
+      ),
+    );
+  }
+
+  const email = parsed.data.email
+    ? normalizeEmailValue(parsed.data.email)
+    : null;
+  const phone = parsed.data.phone
+    ? normalizePhoneValue(parsed.data.phone)
+    : null;
+
+  if (email) {
+    const emailTaken = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (emailTaken) {
+      redirect(
+        buildMessageUrl(
+          `/auth/signin?tab=signup&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          "error",
+          "Este e-mail já está em uso.",
+        ),
+      );
+    }
+  }
+
+  if (phone) {
+    const phoneTaken = await prisma.user.findUnique({
+      where: { phone },
+      select: { id: true },
+    });
+
+    if (phoneTaken) {
+      redirect(
+        buildMessageUrl(
+          `/auth/signin?tab=signup&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          "error",
+          "Este telefone já está em uso.",
+        ),
+      );
+    }
+  }
+
+  const passwordHash = await hash(parsed.data.password, 10);
+
+  await prisma.user.create({
+    data: {
+      name: parsed.data.name,
+      email,
+      phone,
+      passwordHash,
+    },
+  });
+
+  const identifier = email ?? phone;
+
+  if (!identifier) {
+    redirect(
+      buildMessageUrl(
+        "/auth/signin",
+        "success",
+        "Conta criada com sucesso. Faça login para continuar.",
+      ),
+    );
+  }
+
+  try {
+    await signIn("credentials", {
+      identifier,
+      password: parsed.data.password,
+      redirectTo: callbackUrl,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      redirect(
+        buildMessageUrl(
+          "/auth/signin",
+          "success",
+          "Conta criada com sucesso. Faça login para continuar.",
+        ),
+      );
+    }
+
+    throw error;
+  }
+}
+
+export async function forgotPasswordAction(formData: FormData) {
+  const parsed = forgotPasswordSchema.safeParse({
+    identifier: getStringValue(formData, "identifier"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/auth/forgot-password",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível iniciar a recuperação de senha.",
+      ),
+    );
+  }
+
+  const identifier = parsed.data.identifier.trim();
+  const isEmail = identifier.includes("@");
+
+  const user = isEmail
+    ? await prisma.user.findUnique({
+        where: { email: normalizeEmailValue(identifier) },
+        select: { id: true },
+      })
+    : await prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: identifier },
+            { phone: normalizePhoneValue(identifier) },
+          ],
+        },
+        select: { id: true },
+      });
+
+  if (!user) {
+    redirect(
+      buildMessageUrl(
+        "/auth/forgot-password",
+        "success",
+        "Se o cadastro existir, as instruções de redefinição foram geradas.",
+      ),
+    );
+  }
+
+  const token = randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetToken: token,
+      passwordResetExpires: expiresAt,
+    },
+  });
+
+  redirect(
+    buildMessageUrl(
+      `/auth/reset-password?token=${token}`,
+      "success",
+      "Token de recuperação gerado. Defina sua nova senha.",
+    ),
+  );
+}
+
+export async function resetPasswordAction(formData: FormData) {
+  const token = getStringValue(formData, "token");
+  const parsed = resetPasswordSchema.safeParse({
+    token,
+    password: getStringValue(formData, "password"),
+    confirmPassword: getStringValue(formData, "confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        `/auth/reset-password?token=${encodeURIComponent(token)}`,
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível redefinir a senha.",
+      ),
+    );
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetToken: parsed.data.token,
+      passwordResetExpires: {
+        gt: new Date(),
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!user) {
+    redirect(
+      buildMessageUrl(
+        "/auth/forgot-password",
+        "error",
+        "Token inválido ou expirado. Solicite uma nova recuperação.",
+      ),
+    );
+  }
+
+  const passwordHash = await hash(parsed.data.password, 10);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    },
+  });
+
+  redirect(
+    buildMessageUrl(
+      "/auth/signin",
+      "success",
+      "Senha redefinida com sucesso. Faça login para continuar.",
+    ),
+  );
+}
+
+export async function recoverIdentifierAction(formData: FormData) {
+  const parsed = recoverIdentifierSchema.safeParse({
+    name: getStringValue(formData, "name"),
+    knownIdentifier: getStringValue(formData, "knownIdentifier"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/auth/recover-access",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível recuperar seu acesso.",
+      ),
+    );
+  }
+
+  const knownIdentifier = parsed.data.knownIdentifier.trim();
+  const isEmail = knownIdentifier.includes("@");
+
+  const user = isEmail
+    ? await prisma.user.findFirst({
+        where: {
+          name: {
+            contains: parsed.data.name,
+            mode: "insensitive",
+          },
+          email: normalizeEmailValue(knownIdentifier),
+        },
+        select: {
+          email: true,
+          phone: true,
+        },
+      })
+    : await prisma.user.findFirst({
+        where: {
+          name: {
+            contains: parsed.data.name,
+            mode: "insensitive",
+          },
+          OR: [
+            { phone: knownIdentifier },
+            { phone: normalizePhoneValue(knownIdentifier) },
+          ],
+        },
+        select: {
+          email: true,
+          phone: true,
+        },
+      });
+
+  if (!user) {
+    redirect(
+      buildMessageUrl(
+        "/auth/recover-access",
+        "error",
+        "Não encontramos um cadastro com os dados informados.",
+      ),
+    );
+  }
+
+  const hints: string[] = [];
+
+  if (user.email) {
+    hints.push(`E-mail: ${maskEmail(user.email)}`);
+  }
+
+  if (user.phone) {
+    hints.push(`Telefone: ${maskPhone(user.phone)}`);
+  }
+
+  if (hints.length === 0) {
+    redirect(
+      buildMessageUrl(
+        "/auth/recover-access",
+        "error",
+        "Encontramos o cadastro, mas não há contato disponível para recuperação.",
+      ),
+    );
+  }
+
+  redirect(
+    buildMessageUrl(
+      "/auth/signin",
+      "success",
+      `Encontramos seu acesso. ${hints.join(" • ")}`,
+    ),
+  );
 }
 
 export async function signOutAction() {
@@ -243,18 +637,13 @@ export async function updateOrganizerDataSettingsAction(formData: FormData) {
   }
 
   const canUseNickname = supportsUserField("nickname");
-  const canUsePixKey = supportsUserField("pixKey");
 
   const updateData: Record<string, string | null> = {
-    phone: parsed.data.phone || null,
+    phone: parsed.data.phone ? normalizePhoneValue(parsed.data.phone) : null,
   };
 
   if (canUseNickname) {
     updateData.nickname = parsed.data.nickname || null;
-  }
-
-  if (canUsePixKey) {
-    updateData.pixKey = parsed.data.pixKey || null;
   }
 
   await prisma.user.update({
@@ -270,6 +659,47 @@ export async function updateOrganizerDataSettingsAction(formData: FormData) {
       "/dashboard",
       "success",
       "Configurações de dados atualizadas com sucesso.",
+    ),
+  );
+}
+
+export async function updateOrganizerPixSettingsAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerPixSettingsSchema.safeParse({
+    pixKey: getStringValue(formData, "pixKey"),
+    pixBankName: getStringValue(formData, "pixBankName"),
+    pixHolderName: getStringValue(formData, "pixHolderName"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível atualizar as configurações de PIX.",
+      ),
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      pixKey: parsed.data.pixKey || null,
+      pixBankName: parsed.data.pixBankName || null,
+      pixHolderName: parsed.data.pixHolderName || null,
+    },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/rachas/new");
+
+  redirect(
+    buildMessageUrl(
+      "/dashboard",
+      "success",
+      "Configurações de PIX atualizadas com sucesso.",
     ),
   );
 }
@@ -293,10 +723,7 @@ export async function createRachaAction(formData: FormData) {
     state: getStringValue(formData, "state"),
     mapsQuery: getStringValue(formData, "mapsQuery"),
     price: getStringValue(formData, "price"),
-    organizerDisplayName: getStringValue(formData, "organizerDisplayName"),
-    phoneWhatsapp: getStringValue(formData, "phoneWhatsapp"),
     whatsappGroupUrl: getStringValue(formData, "whatsappGroupUrl"),
-    pixKey: getStringValue(formData, "pixKey"),
     coverImageUrl: getStringValue(formData, "coverImageUrl"),
     profileImageUrl: getStringValue(formData, "profileImageUrl"),
     visibility: getStringValue(formData, "visibility") || "OPEN",
@@ -336,23 +763,21 @@ export async function createRachaAction(formData: FormData) {
         )
       : null;
   const slug = await generateUniqueSlug(parsed.data.title);
+  const organizerSettings = await getOrganizerRachaSettings(user.id);
 
-  const canUsePixKey = supportsUserField("pixKey");
-  const userDataToUpdate: Record<string, string> = {
-    phone: parsed.data.phoneWhatsapp,
-  };
-
-  if (canUsePixKey) {
-    userDataToUpdate.pixKey = parsed.data.pixKey;
+  if (
+    !organizerSettings?.organizerDisplayName ||
+    !organizerSettings.phoneWhatsapp ||
+    !organizerSettings.pixKey
+  ) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        "Antes de criar um racha, configure apelido/nome, telefone e chave PIX no painel do organizador.",
+      ),
+    );
   }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      ...userDataToUpdate,
-      name: user.name ?? parsed.data.organizerDisplayName,
-    },
-  });
 
   await prisma.racha.create({
     data: {
@@ -371,10 +796,10 @@ export async function createRachaAction(formData: FormData) {
         parsed.data.mapsQuery ||
         `${parsed.data.locationName}, ${parsed.data.address}, ${parsed.data.city}`,
       priceInCents: Math.round(parsed.data.price * 100),
-      organizerDisplayName: parsed.data.organizerDisplayName,
-      phoneWhatsapp: parsed.data.phoneWhatsapp,
+      organizerDisplayName: organizerSettings.organizerDisplayName,
+      phoneWhatsapp: organizerSettings.phoneWhatsapp,
       whatsappGroupUrl: parsed.data.whatsappGroupUrl || null,
-      pixKey: parsed.data.pixKey,
+      pixKey: organizerSettings.pixKey,
       coverImageUrl: parsed.data.coverImageUrl || null,
       profileImageUrl: parsed.data.profileImageUrl || user.image || null,
       visibility: parsed.data.visibility,
@@ -428,10 +853,7 @@ export async function updateRachaAction(formData: FormData) {
     state: getStringValue(formData, "state"),
     mapsQuery: getStringValue(formData, "mapsQuery"),
     price: getStringValue(formData, "price"),
-    organizerDisplayName: getStringValue(formData, "organizerDisplayName"),
-    phoneWhatsapp: getStringValue(formData, "phoneWhatsapp"),
     whatsappGroupUrl: getStringValue(formData, "whatsappGroupUrl"),
-    pixKey: getStringValue(formData, "pixKey"),
     coverImageUrl: getStringValue(formData, "coverImageUrl"),
     profileImageUrl: getStringValue(formData, "profileImageUrl"),
     visibility: getStringValue(formData, "visibility") || "OPEN",
@@ -472,20 +894,21 @@ export async function updateRachaAction(formData: FormData) {
         )
       : null;
   const slug = await generateUniqueSlug(parsed.data.title, id);
+  const organizerSettings = await getOrganizerRachaSettings(user.id);
 
-  const canUsePixKey = supportsUserField("pixKey");
-  const userDataToUpdate: Record<string, string> = {
-    phone: parsed.data.phoneWhatsapp,
-  };
-
-  if (canUsePixKey) {
-    userDataToUpdate.pixKey = parsed.data.pixKey;
+  if (
+    !organizerSettings?.organizerDisplayName ||
+    !organizerSettings.phoneWhatsapp ||
+    !organizerSettings.pixKey
+  ) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        "Antes de atualizar um racha, configure apelido/nome, telefone e chave PIX no painel do organizador.",
+      ),
+    );
   }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: userDataToUpdate,
-  });
 
   await prisma.racha.update({
     where: { id },
@@ -505,10 +928,10 @@ export async function updateRachaAction(formData: FormData) {
         parsed.data.mapsQuery ||
         `${parsed.data.locationName}, ${parsed.data.address}, ${parsed.data.city}`,
       priceInCents: Math.round(parsed.data.price * 100),
-      organizerDisplayName: parsed.data.organizerDisplayName,
-      phoneWhatsapp: parsed.data.phoneWhatsapp,
+      organizerDisplayName: organizerSettings.organizerDisplayName,
+      phoneWhatsapp: organizerSettings.phoneWhatsapp,
       whatsappGroupUrl: parsed.data.whatsappGroupUrl || null,
-      pixKey: parsed.data.pixKey,
+      pixKey: organizerSettings.pixKey,
       coverImageUrl: parsed.data.coverImageUrl || null,
       profileImageUrl: parsed.data.profileImageUrl || user.image || null,
       visibility: parsed.data.visibility,

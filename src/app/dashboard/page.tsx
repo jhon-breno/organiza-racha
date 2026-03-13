@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import { PaymentStatus, ParticipantStatus, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
-import { updateOrganizerDataSettingsAction } from "@/actions";
+import {
+  updateOrganizerDataSettingsAction,
+  updateOrganizerPixSettingsAction,
+} from "@/actions";
+import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
+import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
@@ -10,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { modalityLabels } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
@@ -42,6 +48,12 @@ export default async function DashboardPage({
   const supportsPixKey = Boolean(
     userModel?.fields.some((field) => field.name === "pixKey"),
   );
+  const supportsPixBankName = Boolean(
+    userModel?.fields.some((field) => field.name === "pixBankName"),
+  );
+  const supportsPixHolderName = Boolean(
+    userModel?.fields.some((field) => field.name === "pixHolderName"),
+  );
 
   const organizerSelect: Record<string, boolean> = {
     email: true,
@@ -55,6 +67,14 @@ export default async function DashboardPage({
 
   if (supportsPixKey) {
     organizerSelect.pixKey = true;
+  }
+
+  if (supportsPixBankName) {
+    organizerSelect.pixBankName = true;
+  }
+
+  if (supportsPixHolderName) {
+    organizerSelect.pixHolderName = true;
   }
 
   const organizerProfile = await prisma.user.findUnique({
@@ -76,6 +96,14 @@ export default async function DashboardPage({
     typeof organizerProfile.phone === "string" ? organizerProfile.phone : "";
   const organizerPixKey =
     typeof organizerProfile.pixKey === "string" ? organizerProfile.pixKey : "";
+  const organizerPixBankName =
+    typeof organizerProfile.pixBankName === "string"
+      ? organizerProfile.pixBankName
+      : "";
+  const organizerPixHolderName =
+    typeof organizerProfile.pixHolderName === "string"
+      ? organizerProfile.pixHolderName
+      : "";
   const organizerEmail =
     typeof organizerProfile.email === "string" ? organizerProfile.email : "";
 
@@ -138,60 +166,104 @@ export default async function DashboardPage({
 
       <FlashMessage status={params.status} message={params.message} />
 
-      <Card className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-950">
-            Configurações de dados
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Defina os dados padrão do organizador para agilizar a criação dos
-            próximos rachas.
-          </p>
-        </div>
-
-        <form
-          action={updateOrganizerDataSettingsAction}
-          className="grid gap-4 md:grid-cols-2"
-        >
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Apelido (opcional)
-            <Input
-              defaultValue={organizerNickname}
-              name="nickname"
-              placeholder={organizerName || "Seu apelido"}
-            />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Telefone
-            <Input
-              defaultValue={organizerPhone}
-              name="phone"
-              placeholder="5585999999999"
-            />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Chave PIX
-            <Input
-              defaultValue={organizerPixKey}
-              name="pixKey"
-              placeholder="CPF, e-mail, telefone ou chave aleatória"
-            />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            E-mail (Google)
-            <Input defaultValue={organizerEmail} disabled readOnly />
-          </label>
-
-          <div className="md:col-span-2">
-            <SubmitButton pendingLabel="Salvando...">
-              Salvar configurações
-            </SubmitButton>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-950">
+              Configurações de dados
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Defina os dados padrão do organizador usados nos próximos rachas.
+            </p>
           </div>
-        </form>
-      </Card>
+
+          <form
+            action={updateOrganizerDataSettingsAction}
+            className="grid gap-4 md:grid-cols-2"
+          >
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Nome completo
+              <Input defaultValue={organizerName} disabled readOnly />
+            </label>
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Apelido (opcional)
+              <Input
+                defaultValue={organizerNickname}
+                name="nickname"
+                placeholder={organizerName || "Seu apelido"}
+              />
+            </label>
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Telefone
+              <PhoneInput
+                defaultValue={organizerPhone}
+                name="phone"
+                placeholder="99 9 9999-9999"
+              />
+            </label>
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              E-mail da conta
+              <Input defaultValue={organizerEmail} disabled readOnly />
+            </label>
+
+            <div className="md:col-span-2">
+              <SubmitButton pendingLabel="Salvando...">
+                Salvar dados
+              </SubmitButton>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-950">
+              Configuração de PIX
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Esses dados serão usados automaticamente nos rachas publicados.
+            </p>
+          </div>
+
+          <form
+            action={updateOrganizerPixSettingsAction}
+            className="grid gap-4"
+          >
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Chave PIX
+              <Input
+                defaultValue={organizerPixKey}
+                name="pixKey"
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+              />
+            </label>
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Nome do banco
+              <Input
+                defaultValue={organizerPixBankName}
+                name="pixBankName"
+                placeholder="Ex.: Nubank, Inter, Caixa"
+              />
+            </label>
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Nome completo do titular
+              <Input
+                defaultValue={organizerPixHolderName}
+                name="pixHolderName"
+                placeholder="Nome igual ao cadastro da conta"
+              />
+            </label>
+
+            <div>
+              <SubmitButton pendingLabel="Salvando...">Salvar PIX</SubmitButton>
+            </div>
+          </form>
+        </Card>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
@@ -230,6 +302,11 @@ export default async function DashboardPage({
       ) : (
         <div className="grid gap-6">
           {rachas.map((racha) => {
+            const confirmedEnrollments = racha.enrollments.filter(
+              (item) =>
+                item.status === ParticipantStatus.ACTIVE &&
+                item.paymentStatus === PaymentStatus.PAID,
+            );
             const confirmed = racha.enrollments.filter(
               (item) =>
                 item.status === ParticipantStatus.ACTIVE &&
@@ -255,6 +332,11 @@ export default async function DashboardPage({
                 participantPhone: item.participantPhone,
                 paymentStatus: item.paymentStatus,
               }));
+            const totalAthletes = racha.enrollments.filter(
+              (item) =>
+                item.status !== ParticipantStatus.CANCELED &&
+                item.paymentStatus !== PaymentStatus.REFUNDED,
+            ).length;
 
             return (
               <Card key={racha.id} className="space-y-5">
@@ -294,10 +376,31 @@ export default async function DashboardPage({
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                    <p className="text-slate-500">Confirmados</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-950">
-                      {confirmed}/{racha.athleteLimit}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-slate-500">Confirmados</p>
+                        <p className="mt-1 text-2xl font-bold text-slate-950">
+                          {confirmed}/{racha.athleteLimit}
+                        </p>
+                      </div>
+                      <ConfirmedListModal
+                        rachaId={racha.id}
+                        rachaTitle={racha.title}
+                        eventDate={racha.eventDate}
+                        locationName={racha.locationName}
+                        enrollments={confirmedEnrollments.map((item) => ({
+                          id: item.id,
+                          participantName: item.participantName,
+                          participantPhone: item.participantPhone,
+                          participantPosition: item.participantPosition,
+                          participantLevel: item.participantLevel,
+                          status: item.status,
+                          paymentStatus: item.paymentStatus,
+                        }))}
+                        athleteLimit={racha.athleteLimit}
+                        whatsappGroupUrl={racha.whatsappGroupUrl}
+                      />
+                    </div>
                   </div>
                   <div className="rounded-2xl bg-amber-50 p-4 text-sm ring-1 ring-amber-100">
                     <div className="flex items-start justify-between gap-3">
@@ -321,14 +424,32 @@ export default async function DashboardPage({
                     </p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                    <p className="text-slate-500">Pedidos de reembolso</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-950">
-                      {
-                        racha.enrollments.filter(
-                          (item) => item.paymentStatus === "REFUND_REQUESTED",
-                        ).length
-                      }
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-slate-500">Todos os atletas</p>
+                        <p className="mt-1 text-2xl font-bold text-slate-950">
+                          {totalAthletes}
+                        </p>
+                      </div>
+                      <AllAthletesListModal
+                        rachaId={racha.id}
+                        rachaTitle={racha.title}
+                        eventDate={racha.eventDate}
+                        locationName={racha.locationName}
+                        enrollments={racha.enrollments.map((item) => ({
+                          id: item.id,
+                          participantName: item.participantName,
+                          participantPhone: item.participantPhone,
+                          participantPosition: item.participantPosition,
+                          participantLevel: item.participantLevel,
+                          status: item.status,
+                          paymentStatus: item.paymentStatus,
+                        }))}
+                        athleteLimit={racha.athleteLimit}
+                        slug={racha.slug}
+                        whatsappGroupUrl={racha.whatsappGroupUrl}
+                      />
+                    </div>
                   </div>
                 </div>
 
