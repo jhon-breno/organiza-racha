@@ -190,16 +190,17 @@ export const refundRequestSchema = z.object({
   enrollmentId: z.string().min(1, "Inscrição inválida."),
   refundReason: z.string().min(3, "Informe o motivo do reembolso."),
   refundPixKey: z.string().min(3, "Informe a chave PIX para devolução."),
+  refundPixAccountName: z
+    .string()
+    .trim()
+    .min(2, "Informe o nome da conta para reembolso."),
+  refundPixHolderName: z
+    .string()
+    .trim()
+    .min(3, "Informe o nome igual ao da conta para reembolso."),
   confirmCancellation: z.coerce
     .boolean()
     .refine((value) => value, "Confirme que deseja cancelar a inscrição."),
-  confirmationText: z
-    .string()
-    .trim()
-    .refine(
-      (value) => value === "CANCELAR",
-      'Digite "CANCELAR" para confirmar a solicitação de reembolso.',
-    ),
 });
 
 export const cancelPendingEnrollmentSchema = z.object({

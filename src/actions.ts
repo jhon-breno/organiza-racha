@@ -1397,8 +1397,9 @@ export async function cancelEnrollmentAction(formData: FormData) {
     enrollmentId: getStringValue(formData, "enrollmentId"),
     refundReason: getStringValue(formData, "refundReason"),
     refundPixKey: getStringValue(formData, "refundPixKey"),
+    refundPixAccountName: getStringValue(formData, "refundPixAccountName"),
+    refundPixHolderName: getStringValue(formData, "refundPixHolderName"),
     confirmCancellation: formData.get("confirmCancellation") === "on",
-    confirmationText: getStringValue(formData, "confirmationText"),
   });
 
   if (!parsed.success) {
@@ -1454,7 +1455,7 @@ export async function cancelEnrollmentAction(formData: FormData) {
     );
   }
 
-  const refundMetadata = `\n\n[Reembolso solicitado]\nMotivo: ${parsed.data.refundReason}\nPIX para devolução: ${parsed.data.refundPixKey}`;
+  const refundMetadata = `\n\n[Reembolso solicitado]\nMotivo: ${parsed.data.refundReason}\nPIX para devolução: ${parsed.data.refundPixKey}\nNome da conta: ${parsed.data.refundPixAccountName}\nNome igual ao da conta: ${parsed.data.refundPixHolderName}`;
 
   await prisma.enrollment.update({
     where: { id: enrollmentId },

@@ -30,6 +30,12 @@ export function MyEnrollmentActions({
   const [isCancelPendingModalOpen, setIsCancelPendingModalOpen] =
     useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [cancelPendingConfirmError, setCancelPendingConfirmError] = useState<
+    string | null
+  >(null);
+  const [refundConfirmError, setRefundConfirmError] = useState<string | null>(
+    null,
+  );
 
   const canPay = paymentStatus === "PENDING" && enrollmentStatus !== "CANCELED";
   const canCancelPending =
@@ -68,7 +74,10 @@ export function MyEnrollmentActions({
 
         {canCancelPending ? (
           <Button
-            onClick={() => setIsCancelPendingModalOpen(true)}
+            onClick={() => {
+              setCancelPendingConfirmError(null);
+              setIsCancelPendingModalOpen(true);
+            }}
             type="button"
             variant="outline"
           >
@@ -78,7 +87,10 @@ export function MyEnrollmentActions({
 
         {canRequestRefund ? (
           <Button
-            onClick={() => setIsRefundModalOpen(true)}
+            onClick={() => {
+              setRefundConfirmError(null);
+              setIsRefundModalOpen(true);
+            }}
             type="button"
             variant="danger"
           >
@@ -101,6 +113,8 @@ export function MyEnrollmentActions({
                   setIsPaymentModalOpen(false);
                   setIsCancelPendingModalOpen(false);
                   setIsRefundModalOpen(false);
+                  setCancelPendingConfirmError(null);
+                  setRefundConfirmError(null);
                 }}
                 type="button"
               >
@@ -139,6 +153,22 @@ export function MyEnrollmentActions({
               <form
                 action={cancelPendingEnrollmentAction}
                 className="space-y-4"
+                onSubmit={(event) => {
+                  const confirmCheckbox =
+                    event.currentTarget.elements.namedItem(
+                      "confirmCancellation",
+                    ) as HTMLInputElement | null;
+
+                  if (!confirmCheckbox?.checked) {
+                    event.preventDefault();
+                    setCancelPendingConfirmError(
+                      "É necessário selecionar a caixa de confirmação.",
+                    );
+                    return;
+                  }
+
+                  setCancelPendingConfirmError(null);
+                }}
               >
                 <input name="enrollmentId" type="hidden" value={enrollmentId} />
 
@@ -151,10 +181,22 @@ export function MyEnrollmentActions({
                   <input
                     className="mt-1 h-4 w-4 rounded border-slate-300"
                     name="confirmCancellation"
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setCancelPendingConfirmError(null);
+                      }
+                    }}
+                    required
                     type="checkbox"
                   />
                   <span>Confirmo que desejo cancelar esta inscrição.</span>
                 </label>
+
+                {cancelPendingConfirmError ? (
+                  <p className="text-sm font-medium text-rose-600">
+                    {cancelPendingConfirmError}
+                  </p>
+                ) : null}
 
                 <label className="space-y-2 text-sm font-medium text-slate-700">
                   Motivo do cancelamento
@@ -182,7 +224,26 @@ export function MyEnrollmentActions({
             ) : null}
 
             {isRefundModalOpen ? (
-              <form action={cancelEnrollmentAction} className="space-y-4">
+              <form
+                action={cancelEnrollmentAction}
+                className="space-y-4"
+                onSubmit={(event) => {
+                  const confirmCheckbox =
+                    event.currentTarget.elements.namedItem(
+                      "confirmCancellation",
+                    ) as HTMLInputElement | null;
+
+                  if (!confirmCheckbox?.checked) {
+                    event.preventDefault();
+                    setRefundConfirmError(
+                      "É necessário selecionar a caixa de confirmação.",
+                    );
+                    return;
+                  }
+
+                  setRefundConfirmError(null);
+                }}
+              >
                 <input name="enrollmentId" type="hidden" value={enrollmentId} />
 
                 <label className="space-y-2 text-sm font-medium text-slate-700">
@@ -217,10 +278,36 @@ export function MyEnrollmentActions({
                   />
                 </label>
 
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  Nome da conta
+                  <input
+                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    name="refundPixAccountName"
+                    placeholder="Ex.: Nubank, Inter, Caixa"
+                    required
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  Nome igual ao da conta
+                  <input
+                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    name="refundPixHolderName"
+                    placeholder="Nome completo do titular"
+                    required
+                  />
+                </label>
+
                 <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                   <input
                     className="mt-1 h-4 w-4 rounded border-slate-300"
                     name="confirmCancellation"
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setRefundConfirmError(null);
+                      }
+                    }}
+                    required
                     type="checkbox"
                   />
                   <span>
@@ -229,16 +316,11 @@ export function MyEnrollmentActions({
                   </span>
                 </label>
 
-                <label className="space-y-2 text-sm font-medium text-slate-700">
-                  Digite <span className="font-black">CANCELAR</span> para
-                  confirmar
-                  <input
-                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                    name="confirmationText"
-                    placeholder="CANCELAR"
-                    required
-                  />
-                </label>
+                {refundConfirmError ? (
+                  <p className="text-sm font-medium text-rose-600">
+                    {refundConfirmError}
+                  </p>
+                ) : null}
 
                 <div className="flex flex-wrap justify-end gap-3">
                   <Button
