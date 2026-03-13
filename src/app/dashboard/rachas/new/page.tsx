@@ -50,6 +50,23 @@ export default async function NewRachaPage({
     select: organizerSelect,
   });
 
+  const organizerNickname =
+    organizerProfile && typeof organizerProfile.nickname === "string"
+      ? organizerProfile.nickname
+      : "";
+  const organizerName =
+    organizerProfile && typeof organizerProfile.name === "string"
+      ? organizerProfile.name
+      : "";
+  const organizerPhone =
+    organizerProfile && typeof organizerProfile.phone === "string"
+      ? organizerProfile.phone
+      : "";
+  const organizerPixKey =
+    organizerProfile && typeof organizerProfile.pixKey === "string"
+      ? organizerProfile.pixKey
+      : "";
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <div>
@@ -63,10 +80,9 @@ export default async function NewRachaPage({
       <FlashMessage status={params.status} message={params.message} />
       <RachaForm
         defaultValues={{
-          organizerDisplayName:
-            organizerProfile?.nickname || organizerProfile?.name || "",
-          phoneWhatsapp: organizerProfile?.phone ?? "",
-          pixKey: organizerProfile?.pixKey ?? "",
+          organizerDisplayName: organizerNickname || organizerName,
+          phoneWhatsapp: organizerPhone,
+          pixKey: organizerPixKey,
         }}
       />
     </div>

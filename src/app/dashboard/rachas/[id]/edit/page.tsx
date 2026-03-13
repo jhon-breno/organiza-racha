@@ -44,6 +44,10 @@ export default async function EditRachaPage({
   }
 
   const editPageUrl = `/dashboard/rachas/${racha.id}/edit`;
+  const pendingPaymentStatuses: PaymentStatus[] = [
+    PaymentStatus.PENDING,
+    PaymentStatus.PROOF_SENT,
+  ];
   const confirmedEnrollments = racha.enrollments.filter(
     (item) =>
       item.status === ParticipantStatus.ACTIVE &&
@@ -53,9 +57,7 @@ export default async function EditRachaPage({
     .filter(
       (item) =>
         item.status === ParticipantStatus.ACTIVE &&
-        [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
-          item.paymentStatus,
-        ),
+        pendingPaymentStatuses.includes(item.paymentStatus),
     )
     .map((item) => ({
       id: item.id,

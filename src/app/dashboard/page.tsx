@@ -66,6 +66,19 @@ export default async function DashboardPage({
     redirect("/auth/signin?callbackUrl=/dashboard");
   }
 
+  const organizerNickname =
+    typeof organizerProfile.nickname === "string"
+      ? organizerProfile.nickname
+      : "";
+  const organizerName =
+    typeof organizerProfile.name === "string" ? organizerProfile.name : "";
+  const organizerPhone =
+    typeof organizerProfile.phone === "string" ? organizerProfile.phone : "";
+  const organizerPixKey =
+    typeof organizerProfile.pixKey === "string" ? organizerProfile.pixKey : "";
+  const organizerEmail =
+    typeof organizerProfile.email === "string" ? organizerProfile.email : "";
+
   const rachas = await prisma.racha.findMany({
     where: { organizerId: session.user.id },
     include: {
@@ -84,15 +97,17 @@ export default async function DashboardPage({
       ).length,
     0,
   );
+  const pendingPaymentStatuses: PaymentStatus[] = [
+    PaymentStatus.PENDING,
+    PaymentStatus.PROOF_SENT,
+  ];
   const pendingParticipants = rachas.reduce(
     (total, racha) =>
       total +
       racha.enrollments.filter(
         (item) =>
           item.status === ParticipantStatus.ACTIVE &&
-          [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
-            item.paymentStatus,
-          ),
+          pendingPaymentStatuses.includes(item.paymentStatus),
       ).length,
     0,
   );
@@ -141,16 +156,16 @@ export default async function DashboardPage({
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Apelido (opcional)
             <Input
-              defaultValue={organizerProfile.nickname ?? ""}
+              defaultValue={organizerNickname}
               name="nickname"
-              placeholder={organizerProfile.name ?? "Seu apelido"}
+              placeholder={organizerName || "Seu apelido"}
             />
           </label>
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Telefone
             <Input
-              defaultValue={organizerProfile.phone ?? ""}
+              defaultValue={organizerPhone}
               name="phone"
               placeholder="5585999999999"
             />
@@ -159,7 +174,7 @@ export default async function DashboardPage({
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Chave PIX
             <Input
-              defaultValue={organizerProfile.pixKey ?? ""}
+              defaultValue={organizerPixKey}
               name="pixKey"
               placeholder="CPF, e-mail, telefone ou chave aleatória"
             />
@@ -167,11 +182,7 @@ export default async function DashboardPage({
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             E-mail (Google)
-            <Input
-              defaultValue={organizerProfile.email ?? ""}
-              disabled
-              readOnly
-            />
+            <Input defaultValue={organizerEmail} disabled readOnly />
           </label>
 
           <div className="md:col-span-2">
@@ -227,9 +238,7 @@ export default async function DashboardPage({
             const awaitingPayment = racha.enrollments.filter(
               (item) =>
                 item.status === ParticipantStatus.ACTIVE &&
-                [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
-                  item.paymentStatus,
-                ),
+                pendingPaymentStatuses.includes(item.paymentStatus),
             ).length;
             const waitlist = racha.enrollments.filter(
               (item) => item.status === ParticipantStatus.WAITLIST,
@@ -238,9 +247,7 @@ export default async function DashboardPage({
               .filter(
                 (item) =>
                   item.status === ParticipantStatus.ACTIVE &&
-                  [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
-                    item.paymentStatus,
-                  ),
+                  pendingPaymentStatuses.includes(item.paymentStatus),
               )
               .map((item) => ({
                 id: item.id,
