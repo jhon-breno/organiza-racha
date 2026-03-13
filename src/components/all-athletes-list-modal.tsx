@@ -216,7 +216,7 @@ export function AllAthletesListModal({
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4">
-          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
@@ -241,8 +241,8 @@ export function AllAthletesListModal({
             </div>
 
             {exportFormat === "whatsapp" ? (
-              <div className="space-y-4 px-5 py-5">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-900 whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+              <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
+                <div className="max-h-[38vh] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-900 whitespace-pre-wrap sm:max-h-[50vh]">
                   {whatsappMessage}
                 </div>
 
@@ -280,7 +280,7 @@ export function AllAthletesListModal({
                 </div>
               </div>
             ) : (
-              <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-5">
+              <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
                 <div className="space-y-2">
                   {activeEnrollments.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
