@@ -55,8 +55,10 @@ Se quiser uma arquitetura ainda mais forte para produção, estas são as melhor
 npm install
 ```
 
-2. Configure as variáveis de ambiente copiando `.env.example` para `.env` e
-   informando uma `DATABASE_URL` PostgreSQL válida.
+2. Configure as variáveis de ambiente copiando `.env.example` para `.env`.
+   Se usar Supabase com Prisma, prefira:
+   - `DATABASE_URL`: string do pooler
+   - `DIRECT_URL`: string direta do banco
 
 3. Gere o banco local:
 
@@ -101,6 +103,7 @@ Enquanto isso, o projeto também oferece um acesso demo local para facilitar val
 2. Crie um banco PostgreSQL gerenciado (Neon, Supabase ou Vercel Postgres).
 3. Na Vercel, importe o projeto e configure as variáveis de ambiente:
    - `DATABASE_URL`
+   - `DIRECT_URL`
    - `AUTH_SECRET`
    - `AUTH_URL` (ex.: `https://seu-projeto.vercel.app`)
    - `AUTH_TRUST_HOST=true`
@@ -108,6 +111,15 @@ Enquanto isso, o projeto também oferece um acesso demo local para facilitar val
 4. Faça o deploy (o projeto usa `vercel.json` com `npm run vercel-build`, que aplica `prisma db push` antes do build).
 5. Se usar Google login, adicione no Google Cloud Console o callback de produção:
    - `https://seu-projeto.vercel.app/api/auth/callback/google`
+
+### Supabase + Prisma no Vercel
+
+Para evitar falhas de conexão, use no painel do Supabase as duas strings corretas:
+
+- `DATABASE_URL`: pegue em **Connection pooling**
+- `DIRECT_URL`: pegue em **Direct connection**
+
+Se a URL direta `db.<project-ref>.supabase.co:5432` falhar localmente, isso normalmente indica bloqueio de rede/IPv6 ou uso da string errada para o ambiente. Para Vercel, a configuração com pooler é a mais estável.
 
 Observação: não execute `npm run db:seed` em produção, pois o seed atual limpa dados existentes.
 
