@@ -1,11 +1,20 @@
 import {
+  addOrganizerEnrollmentAction,
   confirmEnrollmentPaymentAction,
   markEnrollmentRefundedAction,
 } from "@/actions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/submit-button";
-import { levelLabels } from "@/lib/constants";
+import {
+  levelLabels,
+  levelOptions,
+  positionOptions,
+  positionOptionsFutebol,
+  positionOptionsVolei,
+} from "@/lib/constants";
 import { formatDateTimeShort } from "@/lib/utils";
 
 function getUnifiedEnrollmentStatus(enrollment: {
@@ -51,7 +60,11 @@ function getUnifiedEnrollmentStatus(enrollment: {
 
 export function EnrollmentManagement({
   enrollments,
+  modality,
+  rachaId,
 }: {
+  rachaId: string;
+  modality: string;
   enrollments: {
     id: string;
     participantName: string;
@@ -63,8 +76,85 @@ export function EnrollmentManagement({
     createdAt: Date;
   }[];
 }) {
+  const availablePositions =
+    modality === "FUTEBOL"
+      ? positionOptionsFutebol
+      : modality === "VOLEI"
+        ? positionOptionsVolei
+        : positionOptions;
+
   return (
     <div className="space-y-4">
+      <Card className="space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-950">
+            Incluir participante manualmente
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Adicione atletas no racha com os mesmos dados do formulário de
+            inscrição.
+          </p>
+        </div>
+
+        <form
+          action={addOrganizerEnrollmentAction}
+          className="grid gap-4 md:grid-cols-2"
+        >
+          <input name="rachaId" type="hidden" value={rachaId} />
+
+          <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+            Nome
+            <Input
+              name="participantName"
+              placeholder="Nome completo do participante"
+              required
+            />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Telefone
+            <Input name="participantPhone" placeholder="11999999999" required />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Posição
+            <Select defaultValue="Versátil" name="participantPosition">
+              {availablePositions.map((position) => (
+                <option key={position} value={position}>
+                  {position}
+                </option>
+              ))}
+            </Select>
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Nível
+            <Select defaultValue="INTERMEDIARIO" name="participantLevel">
+              {levelOptions.map((level) => (
+                <option key={level.value} value={level.value}>
+                  {level.label}
+                </option>
+              ))}
+            </Select>
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+            Observação (opcional)
+            <textarea
+              className="flex min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+              name="notes"
+              placeholder="Ex.: chega 10 min antes, joga melhor na direita..."
+            />
+          </label>
+
+          <div className="md:col-span-2">
+            <SubmitButton pendingLabel="Incluindo..." size="sm">
+              Incluir participante
+            </SubmitButton>
+          </div>
+        </form>
+      </Card>
+
       {enrollments.length === 0 ? (
         <Card>
           <p className="text-sm text-slate-600">
@@ -115,7 +205,7 @@ export function EnrollmentManagement({
                   </form>
                 ) : null}
 
-                {enrollment.paymentStatus === "REFUND_REQUESTED" ? (
+                {enrollment.paymentStatus === "REFUND_REQUESTED" && (
                   <form action={markEnrollmentRefundedAction}>
                     <input
                       name="enrollmentId"
@@ -130,7 +220,7 @@ export function EnrollmentManagement({
                       Marcar reembolso
                     </SubmitButton>
                   </form>
-                ) : null}
+                )}
               </div>
             </Card>
           );

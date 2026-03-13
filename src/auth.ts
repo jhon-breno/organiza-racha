@@ -37,18 +37,29 @@ const providers = [
         return null;
       }
 
-      const user = await prisma.user.upsert({
+      const existingUser = await prisma.user.findUnique({
         where: { email: parsed.data.email },
-        update: {
-          name: parsed.data.name,
-          emailVerified: new Date(),
-        },
-        create: {
-          name: parsed.data.name,
-          email: parsed.data.email,
-          emailVerified: new Date(),
-        },
       });
+
+      const user = existingUser
+        ? await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              emailVerified: new Date(),
+              ...(existingUser.name
+                ? {}
+                : {
+                    name: parsed.data.name,
+                  }),
+            },
+          })
+        : await prisma.user.create({
+            data: {
+              name: parsed.data.name,
+              email: parsed.data.email,
+              emailVerified: new Date(),
+            },
+          });
 
       return {
         id: user.id,
@@ -70,9 +81,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers,
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google" && user.id) {
+        // Usa o `profile` do OAuth (dados reais do Google),
+        // não o `user` que pode conter dados desatualizados do banco.
+        const googleName =
+          (profile?.name as string | undefined) ?? user.name ?? undefined;
+        const googleEmail =
+          (profile?.email as string | undefined) ?? user.email ?? undefined;
+        const googleImage =
+          (profile?.picture as string | undefined) ??
+          (profile?.image as string | undefined) ??
+          user.image ??
+          undefined;
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            ...(googleName ? { name: googleName } : {}),
+            ...(googleEmail ? { email: googleEmail } : {}),
+            ...(googleImage ? { image: googleImage } : {}),
+            emailVerified: new Date(),
+          },
+        });
+      }
+
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+      }
+
+      if (typeof token.id === "string") {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: {
+            name: true,
+            email: true,
+            image: true,
+          },
+        });
+
+        if (dbUser) {
+          token.name = dbUser.name ?? undefined;
+          token.email = dbUser.email ?? undefined;
+          token.picture = dbUser.image ?? undefined;
+        }
       }
 
       return token;
@@ -80,6 +135,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+
+        if (typeof token.name === "string") {
+          session.user.name = token.name;
+        }
+
+        if (typeof token.email === "string") {
+          session.user.email = token.email;
+        }
+
+        if (typeof token.picture === "string") {
+          session.user.image = token.picture;
+        }
       }
 
       return session;

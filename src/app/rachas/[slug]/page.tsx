@@ -75,6 +75,15 @@ export default async function RachaDetailsPage({
   const myEnrollment = session?.user?.id
     ? racha.enrollments.find(visibleEnrollmentForUser)
     : null;
+  const currentUserProfile = session?.user?.id
+    ? await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          name: true,
+          phone: true,
+        },
+      })
+    : null;
   const confirmedPaidParticipants = racha.enrollments.filter(
     (item) => item.status === "ACTIVE" && item.paymentStatus === "PAID",
   );
@@ -83,7 +92,7 @@ export default async function RachaDetailsPage({
     racha.coverImageUrl,
   );
   const organizerAvatarUrl =
-    racha.profileImageUrl || racha.organizer.image || null;
+    racha.profileImageUrl?.trim() || racha.organizer.image?.trim() || null;
   const organizerDisplayName =
     racha.organizerDisplayName || racha.organizer.name || "Organizador";
 
@@ -180,19 +189,18 @@ export default async function RachaDetailsPage({
 
           <Card className="space-y-4 bg-white/95">
             <div className="flex items-center gap-4">
-              <div
-                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-600 text-xl font-black text-white"
-                style={
-                  organizerAvatarUrl
-                    ? {
-                        backgroundImage: `url(${organizerAvatarUrl})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }
-                    : undefined
-                }
-              >
-                {organizerAvatarUrl ? "" : getInitials(organizerDisplayName)}
+              <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-teal-600 text-xl font-black text-white">
+                {organizerAvatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    alt={organizerDisplayName}
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                    src={organizerAvatarUrl}
+                  />
+                ) : (
+                  getInitials(organizerDisplayName)
+                )}
               </div>
               <div>
                 <p className="text-sm text-slate-500">Organizador</p>
@@ -329,9 +337,12 @@ export default async function RachaDetailsPage({
             </Card>
           ) : (
             <JoinRachaForm
+              defaultParticipantName={
+                currentUserProfile?.name || session?.user?.name || ""
+              }
+              defaultParticipantPhone={currentUserProfile?.phone || ""}
               privateAccessGranted={hasPrivateAccess}
               racha={racha}
-              sessionUser={session?.user}
             />
           )}
 

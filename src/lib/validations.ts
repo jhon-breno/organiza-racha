@@ -168,6 +168,19 @@ export const enrollmentSchema = z.object({
   accessKey: z.string().optional().or(z.literal("")),
 });
 
+export const organizerEnrollmentSchema = z.object({
+  rachaId: z.string().min(1, "Racha inválido."),
+  participantName: z.string().min(2, "Informe o nome do participante."),
+  participantPhone: z.string().min(8, "Informe um telefone válido."),
+  participantPosition: z.string().min(2, "Informe a posição do participante."),
+  participantLevel: z.enum(["INICIANTE", "INTERMEDIARIO", "AVANCADO"]),
+  notes: z
+    .string()
+    .max(280, "Observações com no máximo 280 caracteres.")
+    .optional()
+    .or(z.literal("")),
+});
+
 export const refundRequestSchema = z.object({
   enrollmentId: z.string().min(1, "Inscrição inválida."),
   refundReason: z.string().min(3, "Informe o motivo do reembolso."),

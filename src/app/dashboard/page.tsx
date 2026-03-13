@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
+import { PaymentStatus, ParticipantStatus, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { updateOrganizerDataSettingsAction } from "@/actions";
 import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
+import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -73,10 +74,26 @@ export default async function DashboardPage({
     orderBy: [{ eventDate: "asc" }],
   });
 
-  const activeParticipants = rachas.reduce(
+  const confirmedParticipants = rachas.reduce(
     (total, racha) =>
       total +
-      racha.enrollments.filter((item) => item.status === "ACTIVE").length,
+      racha.enrollments.filter(
+        (item) =>
+          item.status === ParticipantStatus.ACTIVE &&
+          item.paymentStatus === PaymentStatus.PAID,
+      ).length,
+    0,
+  );
+  const pendingParticipants = rachas.reduce(
+    (total, racha) =>
+      total +
+      racha.enrollments.filter(
+        (item) =>
+          item.status === ParticipantStatus.ACTIVE &&
+          [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
+            item.paymentStatus,
+          ),
+      ).length,
     0,
   );
   const refundRequests = rachas.reduce(
@@ -165,7 +182,7 @@ export default async function DashboardPage({
         </form>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <p className="text-sm text-slate-500">Rachas publicados</p>
           <p className="mt-2 text-3xl font-black text-slate-950">
@@ -175,7 +192,13 @@ export default async function DashboardPage({
         <Card>
           <p className="text-sm text-slate-500">Participantes confirmados</p>
           <p className="mt-2 text-3xl font-black text-slate-950">
-            {activeParticipants}
+            {confirmedParticipants}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-sm text-slate-500">Aguardando pagamento</p>
+          <p className="mt-2 text-3xl font-black text-amber-600">
+            {pendingParticipants}
           </p>
         </Card>
         <Card>
@@ -197,11 +220,34 @@ export default async function DashboardPage({
         <div className="grid gap-6">
           {rachas.map((racha) => {
             const confirmed = racha.enrollments.filter(
-              (item) => item.status === "ACTIVE",
+              (item) =>
+                item.status === ParticipantStatus.ACTIVE &&
+                item.paymentStatus === PaymentStatus.PAID,
+            ).length;
+            const awaitingPayment = racha.enrollments.filter(
+              (item) =>
+                item.status === ParticipantStatus.ACTIVE &&
+                [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
+                  item.paymentStatus,
+                ),
             ).length;
             const waitlist = racha.enrollments.filter(
-              (item) => item.status === "WAITLIST",
+              (item) => item.status === ParticipantStatus.WAITLIST,
             ).length;
+            const pendingEnrollments = racha.enrollments
+              .filter(
+                (item) =>
+                  item.status === ParticipantStatus.ACTIVE &&
+                  [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
+                    item.paymentStatus,
+                  ),
+              )
+              .map((item) => ({
+                id: item.id,
+                participantName: item.participantName,
+                participantPhone: item.participantPhone,
+                paymentStatus: item.paymentStatus,
+              }));
 
             return (
               <Card key={racha.id} className="space-y-5">
@@ -239,12 +285,27 @@ export default async function DashboardPage({
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-2xl bg-slate-50 p-4 text-sm">
                     <p className="text-slate-500">Confirmados</p>
                     <p className="mt-1 text-2xl font-bold text-slate-950">
                       {confirmed}/{racha.athleteLimit}
                     </p>
+                  </div>
+                  <div className="rounded-2xl bg-amber-50 p-4 text-sm ring-1 ring-amber-100">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-amber-700">Aguardando pagamento</p>
+                        <p className="mt-1 text-2xl font-bold text-amber-900">
+                          {awaitingPayment}
+                        </p>
+                      </div>
+                      <PendingPaymentsModal
+                        callbackUrl="/dashboard"
+                        enrollments={pendingEnrollments}
+                        rachaTitle={racha.title}
+                      />
+                    </div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4 text-sm">
                     <p className="text-slate-500">Lista de espera</p>

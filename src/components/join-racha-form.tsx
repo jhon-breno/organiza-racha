@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { User } from "next-auth";
 import { useRouter } from "next/navigation";
 import { joinRachaAction, validatePrivateAccessKeyAction } from "@/actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -19,10 +18,13 @@ import {
 
 export function JoinRachaForm({
   privateAccessGranted = false,
+  defaultParticipantName,
+  defaultParticipantPhone,
   racha,
-  sessionUser,
 }: {
   privateAccessGranted?: boolean;
+  defaultParticipantName?: string;
+  defaultParticipantPhone?: string;
   racha: {
     id: string;
     slug: string;
@@ -36,7 +38,6 @@ export function JoinRachaForm({
     setterLimit?: number | null;
     hasFixedSetter?: boolean;
   };
-  sessionUser?: User;
 }) {
   const router = useRouter();
   const [accessKey, setAccessKey] = useState("");
@@ -142,7 +143,7 @@ export function JoinRachaForm({
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Seu nome
             <Input
-              defaultValue={sessionUser?.name ?? ""}
+              defaultValue={defaultParticipantName ?? ""}
               name="participantName"
               placeholder="Nome completo"
               required
@@ -151,7 +152,12 @@ export function JoinRachaForm({
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Telefone
-            <Input name="participantPhone" placeholder="11999999999" required />
+            <Input
+              defaultValue={defaultParticipantPhone ?? ""}
+              name="participantPhone"
+              placeholder="11999999999"
+              required
+            />
           </label>
 
           <div className="grid gap-4 md:grid-cols-2">

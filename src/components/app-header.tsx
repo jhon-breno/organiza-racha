@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { signOutAction } from "@/actions";
 import { MobileHeaderMenu } from "@/components/mobile-header-menu";
 import { Button } from "@/components/ui/button";
+import { getInitials } from "@/lib/utils";
 
 export async function AppHeader() {
   const session = await auth();
@@ -41,6 +42,19 @@ export async function AppHeader() {
                 <PlusCircle className="h-4 w-4" />
                 Novo racha
               </Button>
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-teal-600 text-sm font-bold text-white">
+                {session.user.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    alt={session.user.name ?? "Avatar"}
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                    src={session.user.image}
+                  />
+                ) : (
+                  getInitials(session.user.name)
+                )}
+              </div>
               <form action={signOutAction}>
                 <Button variant="secondary">Sair</Button>
               </form>

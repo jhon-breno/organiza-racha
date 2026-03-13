@@ -1,9 +1,14 @@
+import { PaymentStatus, ParticipantStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
+import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { EnrollmentManagement } from "@/components/enrollment-management";
 import { FlashMessage } from "@/components/flash-message";
+import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { RachaForm } from "@/components/racha-form";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ id: string }>;
@@ -37,6 +42,35 @@ export default async function EditRachaPage({
   if (!racha || racha.organizerId !== session.user.id) {
     notFound();
   }
+
+  const editPageUrl = `/dashboard/rachas/${racha.id}/edit`;
+  const confirmedEnrollments = racha.enrollments.filter(
+    (item) =>
+      item.status === ParticipantStatus.ACTIVE &&
+      item.paymentStatus === PaymentStatus.PAID,
+  );
+  const pendingEnrollments = racha.enrollments
+    .filter(
+      (item) =>
+        item.status === ParticipantStatus.ACTIVE &&
+        [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT].includes(
+          item.paymentStatus,
+        ),
+    )
+    .map((item) => ({
+      id: item.id,
+      participantName: item.participantName,
+      participantPhone: item.participantPhone,
+      paymentStatus: item.paymentStatus,
+    }));
+  const waitlistCount = racha.enrollments.filter(
+    (item) => item.status === ParticipantStatus.WAITLIST,
+  ).length;
+  const totalAthletes = racha.enrollments.filter(
+    (item) =>
+      item.status !== ParticipantStatus.CANCELED &&
+      item.paymentStatus !== PaymentStatus.REFUNDED,
+  ).length;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -73,7 +107,93 @@ export default async function EditRachaPage({
           </p>
         </div>
 
-        <EnrollmentManagement enrollments={racha.enrollments} />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-500">Confirmados</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">
+                  {confirmedEnrollments.length}/{racha.athleteLimit}
+                </p>
+              </div>
+              <ConfirmedListModal
+                rachaId={racha.id}
+                rachaTitle={racha.title}
+                eventDate={racha.eventDate}
+                locationName={racha.locationName}
+                enrollments={confirmedEnrollments.map((item) => ({
+                  id: item.id,
+                  participantName: item.participantName,
+                  participantPhone: item.participantPhone,
+                  participantPosition: item.participantPosition,
+                  participantLevel: item.participantLevel,
+                  status: item.status,
+                  paymentStatus: item.paymentStatus,
+                }))}
+                athleteLimit={racha.athleteLimit}
+                whatsappGroupUrl={racha.whatsappGroupUrl}
+              />
+            </div>
+          </Card>
+
+          <Card className="bg-amber-50 ring-1 ring-amber-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-amber-700">Aguardando pagamento</p>
+                <p className="mt-1 text-2xl font-black text-amber-900">
+                  {pendingEnrollments.length}
+                </p>
+              </div>
+              <PendingPaymentsModal
+                callbackUrl={editPageUrl}
+                enrollments={pendingEnrollments}
+                rachaTitle={racha.title}
+              />
+            </div>
+          </Card>
+
+          <Card>
+            <p className="text-sm text-slate-500">Lista de espera</p>
+            <p className="mt-1 text-2xl font-black text-slate-950">
+              {waitlistCount}
+            </p>
+          </Card>
+
+          <Card>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-500">Todos os atletas</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">
+                  {totalAthletes}
+                </p>
+              </div>
+              <AllAthletesListModal
+                rachaId={racha.id}
+                rachaTitle={racha.title}
+                eventDate={racha.eventDate}
+                locationName={racha.locationName}
+                enrollments={racha.enrollments.map((item) => ({
+                  id: item.id,
+                  participantName: item.participantName,
+                  participantPhone: item.participantPhone,
+                  participantPosition: item.participantPosition,
+                  participantLevel: item.participantLevel,
+                  status: item.status,
+                  paymentStatus: item.paymentStatus,
+                }))}
+                athleteLimit={racha.athleteLimit}
+                slug={racha.slug}
+                whatsappGroupUrl={racha.whatsappGroupUrl}
+              />
+            </div>
+          </Card>
+        </div>
+
+        <EnrollmentManagement
+          enrollments={racha.enrollments}
+          modality={racha.modality}
+          rachaId={racha.id}
+        />
       </section>
     </div>
   );

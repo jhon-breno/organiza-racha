@@ -16,6 +16,7 @@ import {
   combineDateAndTime,
   demoAccessSchema,
   enrollmentSchema,
+  organizerEnrollmentSchema,
   organizerDataSettingsSchema,
   refundRequestSchema,
   rachaFormSchema,
@@ -42,6 +43,40 @@ function supportsUserField(fieldName: string) {
   );
 
   return Boolean(userModel?.fields.some((field) => field.name === fieldName));
+}
+
+function normalizePhoneValue(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits || phone.trim().toLowerCase();
+}
+
+async function hasDuplicatedPhoneEnrollment(
+  rachaId: string,
+  phone: string,
+  excludeEnrollmentId?: string,
+) {
+  const normalizedPhone = normalizePhoneValue(phone);
+
+  const activeEnrollments = await prisma.enrollment.findMany({
+    where: {
+      rachaId,
+      status: {
+        not: ParticipantStatus.CANCELED,
+      },
+      paymentStatus: {
+        not: PaymentStatus.REFUNDED,
+      },
+      ...(excludeEnrollmentId ? { NOT: { id: excludeEnrollmentId } } : {}),
+    },
+    select: {
+      participantPhone: true,
+    },
+  });
+
+  return activeEnrollments.some(
+    (enrollment) =>
+      normalizePhoneValue(enrollment.participantPhone) === normalizedPhone,
+  );
 }
 
 type ValidatePrivateAccessKeyState = {
@@ -566,6 +601,11 @@ export async function joinRachaAction(formData: FormData) {
   }
 
   const racha = await prisma.racha.findUnique({ where: { id: rachaId } });
+
+  if (!racha) {
+    redirect(buildMessageUrl("/", "error", "Racha não encontrado."));
+  }
+
   if (racha.paymentDeadline && new Date() > racha.paymentDeadline) {
     await prisma.enrollment.updateMany({
       where: {
@@ -590,10 +630,6 @@ export async function joinRachaAction(formData: FormData) {
         "O prazo de pagamento deste racha já foi encerrado.",
       ),
     );
-  }
-
-  if (!racha) {
-    redirect(buildMessageUrl("/", "error", "Racha não encontrado."));
   }
 
   const cookieStore = await cookies();
@@ -696,6 +732,22 @@ export async function joinRachaAction(formData: FormData) {
     );
   }
 
+  const duplicatedPhone = await hasDuplicatedPhoneEnrollment(
+    rachaId,
+    parsed.data.participantPhone,
+    existing?.id,
+  );
+
+  if (duplicatedPhone) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "O telefone informado já está inscrito no racha. Por favor, verifique o telefone ou veja se você já está incluso.",
+      ),
+    );
+  }
+
   const confirmedCount = await prisma.enrollment.count({
     where: {
       rachaId,
@@ -754,6 +806,164 @@ export async function joinRachaAction(formData: FormData) {
       nextStatus === ParticipantStatus.WAITLIST
         ? "Inscrição registrada na lista de espera. Acompanhe em Minhas inscrições."
         : "Inscrição registrada com sucesso. Realize o pagamento para seguir no racha.",
+    ),
+  );
+}
+
+export async function addOrganizerEnrollmentAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const rachaId = getStringValue(formData, "rachaId");
+
+  const parsed = organizerEnrollmentSchema.safeParse({
+    rachaId,
+    participantName: getStringValue(formData, "participantName"),
+    participantPhone: getStringValue(formData, "participantPhone"),
+    participantPosition: getStringValue(formData, "participantPosition"),
+    participantLevel: getStringValue(formData, "participantLevel"),
+    notes: getStringValue(formData, "notes"),
+  });
+
+  const callbackUrl = `/dashboard/rachas/${rachaId}/edit`;
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível adicionar o participante.",
+      ),
+    );
+  }
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: parsed.data.rachaId },
+  });
+
+  if (!racha || racha.organizerId !== user.id) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
+  }
+
+  if (racha.eventDate <= new Date()) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Este racha já aconteceu ou foi encerrado.",
+      ),
+    );
+  }
+
+  const duplicatedPhone = await hasDuplicatedPhoneEnrollment(
+    parsed.data.rachaId,
+    parsed.data.participantPhone,
+  );
+
+  if (duplicatedPhone) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "O telefone informado já está inscrito no racha. Por favor, verifique o telefone ou veja se você já está incluso.",
+      ),
+    );
+  }
+
+  if (
+    racha.modality === "FUTEBOL" &&
+    parsed.data.participantPosition === "Goleiro" &&
+    racha.goalkeeperLimit
+  ) {
+    const goalkeeperCount = await prisma.enrollment.count({
+      where: {
+        rachaId: parsed.data.rachaId,
+        status: ParticipantStatus.ACTIVE,
+        participantPosition: "Goleiro",
+      },
+    });
+
+    if (goalkeeperCount >= racha.goalkeeperLimit) {
+      redirect(
+        buildMessageUrl(
+          callbackUrl,
+          "error",
+          "Não há mais vagas para goleiro. Selecione uma posição de linha.",
+        ),
+      );
+    }
+  }
+
+  if (
+    racha.modality === "VOLEI" &&
+    parsed.data.participantPosition === "Levantador" &&
+    racha.hasFixedSetter &&
+    racha.setterLimit
+  ) {
+    const setterCount = await prisma.enrollment.count({
+      where: {
+        rachaId: parsed.data.rachaId,
+        status: ParticipantStatus.ACTIVE,
+        participantPosition: "Levantador",
+      },
+    });
+
+    if (setterCount >= racha.setterLimit) {
+      redirect(
+        buildMessageUrl(
+          callbackUrl,
+          "error",
+          "Não há mais vagas de levantador fixo. Selecione outra posição.",
+        ),
+      );
+    }
+  }
+
+  const confirmedCount = await prisma.enrollment.count({
+    where: {
+      rachaId: parsed.data.rachaId,
+      status: ParticipantStatus.ACTIVE,
+    },
+  });
+
+  const nextStatus =
+    confirmedCount >= racha.athleteLimit
+      ? ParticipantStatus.WAITLIST
+      : ParticipantStatus.ACTIVE;
+
+  const participantUser = await prisma.user.create({
+    data: {
+      name: parsed.data.participantName,
+      phone: parsed.data.participantPhone,
+    },
+  });
+
+  await prisma.enrollment.create({
+    data: {
+      rachaId: parsed.data.rachaId,
+      userId: participantUser.id,
+      participantName: parsed.data.participantName,
+      participantPhone: parsed.data.participantPhone,
+      participantPosition: parsed.data.participantPosition,
+      participantLevel: parsed.data.participantLevel,
+      acceptedRules: true,
+      pixPaid: false,
+      notes: parsed.data.notes || null,
+      status: nextStatus,
+      paymentStatus: PaymentStatus.PENDING,
+    },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${racha.slug}`);
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      nextStatus === ParticipantStatus.WAITLIST
+        ? "Participante incluído na lista de espera com sucesso."
+        : "Participante incluído com sucesso.",
     ),
   );
 }
@@ -917,11 +1127,15 @@ export async function cancelPendingEnrollmentAction(formData: FormData) {
 export async function confirmEnrollmentPaymentAction(formData: FormData) {
   const user = await requireUser("/dashboard");
   const enrollmentId = getStringValue(formData, "enrollmentId");
+  const callbackUrl = getStringValue(formData, "callbackUrl");
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
     include: { racha: true },
   });
+
+  const redirectUrl =
+    callbackUrl || `/dashboard/rachas/${enrollment?.rachaId ?? ""}/edit`;
 
   if (!enrollment || enrollment.racha.organizerId !== user.id) {
     redirect(
@@ -932,7 +1146,7 @@ export async function confirmEnrollmentPaymentAction(formData: FormData) {
   if (enrollment.status === ParticipantStatus.CANCELED) {
     redirect(
       buildMessageUrl(
-        `/dashboard/rachas/${enrollment.rachaId}/edit`,
+        redirectUrl,
         "error",
         "Não é possível confirmar pagamento de inscrição cancelada.",
       ),
@@ -949,11 +1163,71 @@ export async function confirmEnrollmentPaymentAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/rachas/${enrollment.rachaId}/edit`);
+  if (callbackUrl) {
+    revalidatePath(callbackUrl);
+  }
+  redirect(buildMessageUrl(redirectUrl, "success", "Pagamento confirmado."));
+}
+
+export async function removeOrganizerPendingEnrollmentAction(
+  formData: FormData,
+) {
+  const user = await requireUser("/dashboard");
+  const enrollmentId = getStringValue(formData, "enrollmentId");
+  const callbackUrl = getStringValue(formData, "callbackUrl");
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: { racha: true },
+  });
+
+  const redirectUrl =
+    callbackUrl || `/dashboard/rachas/${enrollment?.rachaId ?? ""}/edit`;
+
+  if (!enrollment || enrollment.racha.organizerId !== user.id) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  if (enrollment.paymentStatus === PaymentStatus.PAID) {
+    redirect(
+      buildMessageUrl(
+        redirectUrl,
+        "error",
+        "Use o fluxo de reembolso para participantes com pagamento confirmado.",
+      ),
+    );
+  }
+
+  if (enrollment.status === ParticipantStatus.CANCELED) {
+    redirect(
+      buildMessageUrl(redirectUrl, "error", "Essa inscrição já foi removida."),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      status: ParticipantStatus.CANCELED,
+      canceledAt: new Date(),
+      notes:
+        `${enrollment.notes ?? ""}\n\n[Remoção pelo organizador]\nMotivo: inscrição pendente removida manualmente.`.trim(),
+    },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/dashboard/rachas/${enrollment.rachaId}/edit`);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
+  if (callbackUrl) {
+    revalidatePath(callbackUrl);
+  }
+
   redirect(
     buildMessageUrl(
-      `/dashboard/rachas/${enrollment.rachaId}/edit`,
+      redirectUrl,
       "success",
-      "Pagamento confirmado.",
+      "Inscrição pendente removida com sucesso.",
     ),
   );
 }

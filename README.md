@@ -8,7 +8,7 @@ Sistema web completo para gestão de rachas esportivos com foco em experiência 
 - TypeScript
 - Tailwind CSS 4
 - Prisma ORM
-- SQLite para desenvolvimento local didático
+- PostgreSQL (produção e desenvolvimento)
 - Auth.js / NextAuth com Google Login e acesso demo local
 - Componentes reutilizáveis com abordagem inspirada em shadcn/ui
 
@@ -55,7 +55,8 @@ Se quiser uma arquitetura ainda mais forte para produção, estas são as melhor
 npm install
 ```
 
-2. Configure as variáveis de ambiente copiando `.env.example` para `.env`.
+2. Configure as variáveis de ambiente copiando `.env.example` para `.env` e
+   informando uma `DATABASE_URL` PostgreSQL válida.
 
 3. Gere o banco local:
 
@@ -93,6 +94,22 @@ Para ativar o login com Google:
 Também é aceito o padrão `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`.
 
 Enquanto isso, o projeto também oferece um acesso demo local para facilitar validação e desenvolvimento.
+
+## Deploy no Vercel (funcional)
+
+1. Suba o repositório para GitHub.
+2. Crie um banco PostgreSQL gerenciado (Neon, Supabase ou Vercel Postgres).
+3. Na Vercel, importe o projeto e configure as variáveis de ambiente:
+   - `DATABASE_URL`
+   - `AUTH_SECRET`
+   - `AUTH_URL` (ex.: `https://seu-projeto.vercel.app`)
+   - `AUTH_TRUST_HOST=true`
+   - `AUTH_GOOGLE_ID` e `AUTH_GOOGLE_SECRET` (opcional)
+4. Faça o deploy (o projeto usa `vercel.json` com `npm run vercel-build`, que aplica `prisma db push` antes do build).
+5. Se usar Google login, adicione no Google Cloud Console o callback de produção:
+   - `https://seu-projeto.vercel.app/api/auth/callback/google`
+
+Observação: não execute `npm run db:seed` em produção, pois o seed atual limpa dados existentes.
 
 ## Próximos passos sugeridos
 

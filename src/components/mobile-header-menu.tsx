@@ -151,19 +151,18 @@ function DrawerContent({
             <div className="border-b border-slate-200 bg-white px-4 py-4">
               {isLoggedIn ? (
                 <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-teal-600 text-sm font-bold text-white"
-                    style={
-                      user?.image
-                        ? {
-                            backgroundImage: `url(${user.image})`,
-                            backgroundPosition: "center",
-                            backgroundSize: "cover",
-                          }
-                        : undefined
-                    }
-                  >
-                    {user?.image ? "" : getInitials(user?.name)}
+                  <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-teal-600 text-sm font-bold text-white">
+                    {user?.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={user?.name ?? "Avatar"}
+                        className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                        src={user.image.trim()}
+                      />
+                    ) : (
+                      getInitials(user?.name)
+                    )}
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">

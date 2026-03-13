@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -51,6 +52,10 @@ function csvEscape(value: string) {
   }
 
   return normalized;
+}
+
+function sanitizePdfText(value: string) {
+  return value.replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "");
 }
 
 export async function GET(
@@ -109,40 +114,57 @@ export async function GET(
     });
   }
 
-  const PDFDocument = (await import("pdfkit")).default;
-  const doc = new PDFDocument({ margin: 36, size: "A4" });
-  const chunks: Buffer[] = [];
+  const pdfDoc = await PDFDocument.create();
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 36;
+  const lineHeight = 14;
 
-  const pdfBufferPromise = new Promise<Buffer>((resolve) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-  });
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
 
-  doc.fontSize(16).text(`Inscritos do racha: ${racha.title}`);
-  doc.moveDown(0.5);
-  doc.fontSize(11).text(`PIX do racha: ${racha.pixKey}`);
-  doc.moveDown(0.8);
+  const drawLine = (text: string, bold = false, size = 10) => {
+    page.drawText(sanitizePdfText(text), {
+      x: margin,
+      y,
+      size,
+      font: bold ? fontBold : fontRegular,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+    y -= lineHeight;
+  };
+
+  const ensureSpace = (needed = 56) => {
+    if (y - needed < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+  };
+
+  drawLine(`Inscritos do racha: ${racha.title}`, true, 14);
+  y -= 4;
+  drawLine(`PIX do racha: ${racha.pixKey}`);
+  y -= 8;
 
   if (rows.length === 0) {
-    doc.fontSize(11).text("Não há inscritos neste racha.");
+    drawLine("Não há inscritos neste racha.");
   } else {
     rows.forEach((row, index) => {
-      doc
-        .fontSize(11)
-        .text(`${index + 1}. ${row.name}`)
-        .text(`Status: ${row.status}`)
-        .text(`Telefone: ${row.phone}`)
-        .text(`Chave PIX: ${row.pixKey}`)
-        .moveDown(0.5);
+      ensureSpace();
+      drawLine(`${index + 1}. ${row.name}`, true);
+      drawLine(`Status: ${row.status}`);
+      drawLine(`Telefone: ${row.phone}`);
+      drawLine(`Chave PIX: ${row.pixKey}`);
+      y -= 6;
     });
   }
 
-  doc.end();
+  const pdfBytes = await pdfDoc.save();
 
-  const pdfBuffer = await pdfBufferPromise;
-
-  return new Response(new Uint8Array(pdfBuffer), {
+  return new Response(new Uint8Array(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="inscritos-${racha.slug}.pdf"`,

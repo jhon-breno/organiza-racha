@@ -13,6 +13,28 @@ export function FlashMessage({
   status?: string;
   message?: string;
 }) {
+  useEffect(() => {
+    if (!message) {
+      return;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    const nextParams = new URLSearchParams(currentUrl.search);
+    const hasStatus = nextParams.has("status");
+    const hasMessage = nextParams.has("message");
+
+    if (!hasStatus && !hasMessage) {
+      return;
+    }
+
+    nextParams.delete("status");
+    nextParams.delete("message");
+
+    const query = nextParams.toString();
+    const nextUrl = `${currentUrl.pathname}${query ? `?${query}` : ""}${currentUrl.hash}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [message]);
+
   if (!message) {
     return null;
   }
