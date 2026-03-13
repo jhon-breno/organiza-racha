@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured } from "@/auth";
-import { demoAccessAction, signInWithGoogleAction } from "@/actions";
+import { signInWithGoogleAction } from "@/actions";
 import { FlashMessage } from "@/components/flash-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 type SearchParams = Promise<{
   callbackUrl?: string;
@@ -37,9 +36,8 @@ export default async function SignInPage({
             Entre para criar rachas, gerenciar atletas e acompanhar pagamentos.
           </h1>
           <p className="max-w-xl text-sm leading-7 text-white/75">
-            O projeto já está preparado para Google Login. Enquanto você
-            configura as credenciais OAuth, o modo demo local também fica
-            disponível para testes e demonstrações.
+            O acesso acontece com Google Login, com sessões seguras e
+            experiência consistente entre ambiente local e produção.
           </p>
         </Card>
 
@@ -57,38 +55,6 @@ export default async function SignInPage({
                 {isGoogleConfigured
                   ? "Entrar com Google"
                   : "Configurar Google Login"}
-              </SubmitButton>
-            </form>
-          </Card>
-
-          <Card className="space-y-4">
-            <h2 className="text-2xl font-bold text-slate-950">
-              Modo demo local
-            </h2>
-            <p className="text-sm leading-6 text-slate-600">
-              Ideal para validar rapidamente o fluxo sem depender do OAuth.
-            </p>
-            <form action={demoAccessAction} className="space-y-4">
-              <input name="callbackUrl" type="hidden" value={callbackUrl} />
-              <label className="space-y-2 text-sm font-medium text-slate-700">
-                Nome
-                <Input name="name" placeholder="Seu nome" required />
-              </label>
-              <label className="space-y-2 text-sm font-medium text-slate-700">
-                E-mail
-                <Input
-                  name="email"
-                  placeholder="voce@email.com"
-                  type="email"
-                  required
-                />
-              </label>
-              <SubmitButton
-                className="w-full"
-                pendingLabel="Entrando..."
-                variant="outline"
-              >
-                Entrar no modo demo
               </SubmitButton>
             </form>
           </Card>

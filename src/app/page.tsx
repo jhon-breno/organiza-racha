@@ -137,20 +137,20 @@ export default async function Home({
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-950">
-              Extras incluídos
+              Gestão centralizada
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Lista de espera, painel do organizador, confirmação de PIX e fluxo
-              de reembolso.
+              Controle participantes confirmados, pendentes e lista de espera em
+              um único painel com ações rápidas.
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-950">
-              Login facilitado
+              Compartilhamento e comunicação
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              O projeto já vem preparado para Google Login e também oferece modo
-              demo local para acelerar testes.
+              Exporte listas em PDF/Excel, gere mensagem para WhatsApp e
+              mantenha o grupo do racha sempre atualizado.
             </p>
           </div>
         </div>
