@@ -5,14 +5,14 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { demoAccessSchema } from "@/lib/validations";
 
-const googleClientId =
-  process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret =
-  process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET;
+const googleClientId = (
+  process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID
+)?.trim();
+const googleClientSecret = (
+  process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
+)?.trim();
 
-export const isGoogleConfigured = Boolean(
-  googleClientId?.trim() && googleClientSecret?.trim(),
-);
+export const isGoogleConfigured = Boolean(googleClientId && googleClientSecret);
 
 const providers = [
   ...(isGoogleConfigured
@@ -71,7 +71,7 @@ const providers = [
   }),
 ];
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const authResult = NextAuth({
   adapter: PrismaAdapter(prisma),
   pages: {
     signIn: "/auth/signin",
@@ -82,7 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === "google" && user.id) {
+      if (account?.provider === "google") {
         // Usa o `profile` do OAuth (dados reais do Google),
         // não o `user` que pode conter dados desatualizados do banco.
         const googleName =
@@ -95,15 +95,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.image ??
           undefined;
 
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            ...(googleName ? { name: googleName } : {}),
-            ...(googleEmail ? { email: googleEmail } : {}),
-            ...(googleImage ? { image: googleImage } : {}),
-            emailVerified: new Date(),
-          },
-        });
+        const targetUserWhere =
+          typeof user.id === "string" && user.id
+            ? { id: user.id }
+            : googleEmail
+              ? { email: googleEmail }
+              : null;
+
+        if (targetUserWhere) {
+          await prisma.user.updateMany({
+            where: targetUserWhere,
+            data: {
+              ...(googleName ? { name: googleName } : {}),
+              ...(googleImage ? { image: googleImage } : {}),
+              emailVerified: new Date(),
+            },
+          });
+        }
       }
 
       return true;
@@ -153,3 +161,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+const { handlers, auth: rawAuth, signIn, signOut } = authResult;
+
+export const auth: typeof rawAuth = (async (...args: unknown[]) => {
+  try {
+    return await (rawAuth as (...innerArgs: unknown[]) => Promise<unknown>)(
+      ...args,
+    );
+  } catch (error) {
+    const isJwtSessionError =
+      error instanceof Error &&
+      (error.name === "JWTSessionError" ||
+        error.message.includes("JWTSessionError"));
+
+    if (isJwtSessionError) {
+      return null;
+    }
+
+    throw error;
+  }
+}) as typeof rawAuth;
+
+export { handlers, signIn, signOut };
