@@ -1,8 +1,95 @@
 import { type ClassValue, clsx } from "clsx";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
 import { defaultCoverByModality } from "@/lib/constants";
+
+export const APP_TIME_ZONE = "America/Sao_Paulo";
+
+type DatePartKey = "year" | "month" | "day" | "hour" | "minute" | "second";
+
+function normalizeDateValue(date: Date | string | number) {
+  const parsed = date instanceof Date ? date : new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Data inválida.");
+  }
+
+  return parsed;
+}
+
+function getTimeZoneFormatter(
+  options: Intl.DateTimeFormatOptions,
+  locale = "pt-BR",
+) {
+  return new Intl.DateTimeFormat(locale, {
+    ...options,
+    timeZone: APP_TIME_ZONE,
+  });
+}
+
+function getTimeZoneParts(date: Date | string | number) {
+  const normalized = normalizeDateValue(date);
+  const formatter = getTimeZoneFormatter(
+    {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    },
+    "en-CA",
+  );
+
+  return formatter.formatToParts(normalized).reduce(
+    (parts, part) => {
+      if (
+        part.type === "year" ||
+        part.type === "month" ||
+        part.type === "day" ||
+        part.type === "hour" ||
+        part.type === "minute" ||
+        part.type === "second"
+      ) {
+        parts[part.type] = part.value;
+      }
+
+      return parts;
+    },
+    {} as Record<DatePartKey, string>,
+  );
+}
+
+function getTimeZoneOffsetMilliseconds(date: Date | string | number) {
+  const normalized = normalizeDateValue(date);
+  const parts = getTimeZoneParts(normalized);
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+
+  return asUtc - normalized.getTime();
+}
+
+export function createDateInAppTimeZone(date: string, time: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+
+  if (
+    [year, month, day, hour, minute].some((value) => Number.isNaN(value))
+  ) {
+    throw new Error("Data ou horário inválido.");
+  }
+
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const offset = getTimeZoneOffsetMilliseconds(utcGuess);
+
+  return new Date(utcGuess.getTime() - offset);
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -58,19 +145,29 @@ export function formatCurrencyFromCents(value: number) {
 }
 
 export function formatDateTime(date: Date) {
-  return format(date, "dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
+  const normalized = normalizeDateValue(date);
+  const parts = getTimeZoneParts(normalized);
+  const monthName = getTimeZoneFormatter({ month: "long" }).format(normalized);
+
+  return `${parts.day} de ${monthName} às ${parts.hour}:${parts.minute}`;
 }
 
 export function formatDateTimeShort(date: Date) {
-  return format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+  const parts = getTimeZoneParts(date);
+
+  return `${parts.day}/${parts.month}/${parts.year} às ${parts.hour}:${parts.minute}`;
 }
 
 export function formatDateInput(date: Date) {
-  return format(date, "yyyy-MM-dd");
+  const parts = getTimeZoneParts(date);
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 export function formatTimeInput(date: Date) {
-  return format(date, "HH:mm");
+  const parts = getTimeZoneParts(date);
+
+  return `${parts.hour}:${parts.minute}`;
 }
 
 export function getMapsEmbedUrl(query?: string | null) {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { createDateInAppTimeZone } from "@/lib/utils";
 
 function isEmailValue(value: string) {
   return z.string().email().safeParse(value).success;
@@ -93,11 +94,23 @@ export const rachaFormSchema = z
       });
     }
 
-    const eventDateTime = new Date(`${data.eventDate}T${data.eventTime}:00`);
+    let eventDateTime: Date;
+
+    try {
+      eventDateTime = createDateInAppTimeZone(data.eventDate, data.eventTime);
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["eventDate"],
+        message: "Data ou horário do racha inválido.",
+      });
+      return;
+    }
+
     const hasPaymentDeadlineDate = Boolean(data.paymentDeadlineDate?.trim());
     const hasPaymentDeadlineTime = Boolean(data.paymentDeadlineTime?.trim());
 
-    if (!Number.isNaN(eventDateTime.getTime()) && eventDateTime <= new Date()) {
+    if (eventDateTime <= new Date()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["eventDate"],
@@ -115,11 +128,14 @@ export const rachaFormSchema = z
     }
 
     if (hasPaymentDeadlineDate && hasPaymentDeadlineTime) {
-      const paymentDeadline = new Date(
-        `${data.paymentDeadlineDate}T${data.paymentDeadlineTime}:00`,
-      );
+      let paymentDeadline: Date;
 
-      if (Number.isNaN(paymentDeadline.getTime())) {
+      try {
+        paymentDeadline = createDateInAppTimeZone(
+          data.paymentDeadlineDate,
+          data.paymentDeadlineTime,
+        );
+      } catch {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["paymentDeadlineDate"],
@@ -136,10 +152,7 @@ export const rachaFormSchema = z
         });
       }
 
-      if (
-        !Number.isNaN(eventDateTime.getTime()) &&
-        paymentDeadline >= eventDateTime
-      ) {
+      if (paymentDeadline >= eventDateTime) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["paymentDeadlineDate"],
@@ -338,8 +351,7 @@ export const organizerPixSettingsSchema = z.object({
 });
 
 export function combineDateAndTime(date: string, time: string) {
-  const isoString = `${date}T${time}:00`;
-  const parsed = new Date(isoString);
+  const parsed = createDateInAppTimeZone(date, time);
 
   if (Number.isNaN(parsed.getTime())) {
     throw new Error("Data ou horário inválido.");
