@@ -129,12 +129,24 @@ export const rachaFormSchema = z
     }
 
     if (hasPaymentDeadlineDate && hasPaymentDeadlineTime) {
+      const paymentDeadlineDate = data.paymentDeadlineDate;
+      const paymentDeadlineTime = data.paymentDeadlineTime;
+
+      if (!paymentDeadlineDate || !paymentDeadlineTime) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["paymentDeadlineDate"],
+          message: "Informe data e horário do prazo de pagamento.",
+        });
+        return;
+      }
+
       let paymentDeadline: Date;
 
       try {
         paymentDeadline = createDateInAppTimeZone(
-          data.paymentDeadlineDate,
-          data.paymentDeadlineTime,
+          paymentDeadlineDate,
+          paymentDeadlineTime,
         );
       } catch {
         ctx.addIssue({

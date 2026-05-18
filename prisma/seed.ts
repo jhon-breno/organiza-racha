@@ -1,6 +1,5 @@
 import {
   Modality,
-  ParticipantLevel,
   ParticipantStatus,
   PaymentStatus,
   Visibility,
@@ -98,7 +97,7 @@ async function main() {
       participantName: player.name ?? "Carlos Participante",
       participantPhone: player.phone ?? "11988887777",
       participantPosition: "Meio-campo",
-      participantLevel: ParticipantLevel.STAR_3,
+      participantLevel: "STAR_3" as never,
       acceptedRules: true,
       pixPaid: true,
       notes: "Posso chegar 15 minutos antes.",
