@@ -96,6 +96,7 @@ export default async function RachaDetailsPage({
     racha.profileImageUrl?.trim() || racha.organizer.image?.trim() || null;
   const organizerDisplayName =
     racha.organizerDisplayName || racha.organizer.name || "Organizador";
+  const isPublishedForEnrollment = Boolean(racha.pixKey.trim());
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -208,25 +209,29 @@ export default async function RachaDetailsPage({
                 <p className="text-lg font-bold text-slate-950">
                   {organizerDisplayName}
                 </p>
-                <p className="text-sm text-slate-600">
-                  WhatsApp: {racha.phoneWhatsapp}
-                </p>
+                {racha.phoneWhatsapp ? (
+                  <p className="text-sm text-slate-600">
+                    WhatsApp: {racha.phoneWhatsapp}
+                  </p>
+                ) : null}
               </div>
             </div>
 
             <div className="grid gap-3">
-              <Button
-                asChild
-                href={`https://wa.me/${racha.phoneWhatsapp.replace(/\D/g, "")}`}
-                rel="noopener noreferrer"
-                target="_blank"
-                variant="outline"
-              >
-                <>
-                  <MessageCircleIcon className="h-4 w-4 text-green-500" />
-                  Falar com Organizador
-                </>
-              </Button>
+              {racha.phoneWhatsapp ? (
+                <Button
+                  asChild
+                  href={`https://wa.me/${racha.phoneWhatsapp.replace(/\D/g, "")}`}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  variant="outline"
+                >
+                  <>
+                    <MessageCircleIcon className="h-4 w-4 text-green-500" />
+                    Falar com Organizador
+                  </>
+                </Button>
+              ) : null}
               {hasPrivateAccess && racha.whatsappGroupUrl ? (
                 <Button
                   asChild
@@ -335,6 +340,17 @@ export default async function RachaDetailsPage({
               <Button asChild href="/minhas-inscricoes" variant="outline">
                 Ver minhas inscrições
               </Button>
+            </Card>
+          ) : !isPublishedForEnrollment ? (
+            <Card className="space-y-4 border-amber-200 bg-amber-50">
+              <h2 className="text-2xl font-bold text-amber-900">
+                Racha aguardando configuracao de PIX
+              </h2>
+              <p className="text-sm leading-6 text-amber-800">
+                Este racha ja foi salvo pelo organizador, mas ainda nao esta
+                publicado para receber inscricoes. Assim que a chave PIX for
+                configurada, a inscricao sera liberada automaticamente.
+              </p>
             </Card>
           ) : (
             <JoinRachaForm

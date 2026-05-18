@@ -32,6 +32,7 @@ export default async function Home({
   const allMatchingRachas = await prisma.racha.findMany({
     where: {
       status: "PUBLISHED",
+      pixKey: { not: "" },
       eventDate: { gte: new Date() },
       ...(modality ? { modality: modality as never } : {}),
       ...(visibility ? { visibility: visibility as never } : {}),
@@ -64,7 +65,7 @@ export default async function Home({
     : allMatchingRachas;
 
   const [totalRachas, totalOrganizadores, totalInscricoes] = await Promise.all([
-    prisma.racha.count({ where: { status: "PUBLISHED" } }),
+    prisma.racha.count({ where: { status: "PUBLISHED", pixKey: { not: "" } } }),
     prisma.user.count({ where: { rachas: { some: {} } } }),
     prisma.enrollment.count({
       where: { status: { in: ["ACTIVE", "WAITLIST"] } },

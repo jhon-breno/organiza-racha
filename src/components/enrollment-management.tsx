@@ -1,13 +1,19 @@
+"use client";
+
+import { useState } from "react";
 import {
   addOrganizerEnrollmentAction,
+  bulkAddOrganizerEnrollmentsAction,
   confirmEnrollmentPaymentAction,
   markEnrollmentRefundedAction,
 } from "@/actions";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import {
   levelLabels,
@@ -82,6 +88,7 @@ export function EnrollmentManagement({
     createdAt: Date;
   }[];
 }) {
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const availablePositions =
     modality === "FUTEBOL"
       ? positionOptionsFutebol
@@ -92,14 +99,25 @@ export function EnrollmentManagement({
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
-        <div>
-          <h3 className="text-lg font-bold text-slate-950">
-            Incluir participante manualmente
-          </h3>
-          <p className="mt-1 text-sm text-slate-600">
-            Adicione atletas no racha com os mesmos dados do formulário de
-            inscrição.
-          </p>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-950">
+              Incluir participante manualmente
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Adicione atletas no racha com os mesmos dados do formulário de
+              inscrição.
+            </p>
+          </div>
+
+          <Button
+            onClick={() => setShowBulkImport((current) => !current)}
+            size="sm"
+            type="button"
+            variant={showBulkImport ? "secondary" : "outline"}
+          >
+            {showBulkImport ? "Fechar importacao em massa" : "Subir atletas massivamente"}
+          </Button>
         </div>
 
         <form
@@ -164,6 +182,51 @@ export function EnrollmentManagement({
           </div>
         </form>
       </Card>
+
+      {showBulkImport ? (
+        <Card className="space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-950">
+              Importacao em massa
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Cole uma linha por atleta usando o formato:
+              <span className="font-semibold"> nome;telefone;nivel;funcao</span>.
+              Se a funcao vier vazia, o sistema usa Versatil.
+            </p>
+          </div>
+
+          <form action={bulkAddOrganizerEnrollmentsAction} className="space-y-4">
+            <input name="rachaId" type="hidden" value={rachaId} />
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              Lista de atletas
+              <Textarea
+                className="min-h-48"
+                name="bulkEntries"
+                placeholder={[
+                  "nome;telefone;nivel;funcao",
+                  "Joao Silva;85999999999;3;Atacante",
+                  "Pedro Lima;85988888888;STAR_4;",
+                  "Carlos Souza;85977777777;5;Goleiro",
+                ].join("\n")}
+                required
+              />
+            </label>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              Niveis aceitos: 1, 2, 3, 4, 5, STAR_1 a STAR_5, INICIANTE,
+              INTERMEDIARIO e AVANCADO.
+            </div>
+
+            <div>
+              <SubmitButton pendingLabel="Importando..." size="sm">
+                Importar atletas
+              </SubmitButton>
+            </div>
+          </form>
+        </Card>
+      ) : null}
 
       {enrollments.length === 0 ? (
         <Card>

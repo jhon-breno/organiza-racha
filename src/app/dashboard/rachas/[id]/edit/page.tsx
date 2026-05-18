@@ -1,13 +1,14 @@
 import { ParticipantStatus } from "@prisma/client";
+import { Shuffle } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
 import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { EnrollmentManagement } from "@/components/enrollment-management";
 import { FlashMessage } from "@/components/flash-message";
+import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { RachaForm } from "@/components/racha-form";
-import { TeamDrawModule } from "@/components/team-draw-module";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -19,7 +20,7 @@ import {
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ id: string }>;
-type SearchParams = Promise<{ status?: string; message?: string }>;
+type SearchParams = Promise<{ status?: string; message?: string; field?: string }>;
 
 export default async function EditRachaPage({
   params,
@@ -68,7 +69,16 @@ export default async function EditRachaPage({
   ).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+    <div
+      className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8"
+      id="edit-racha-page"
+    >
+      <PageActionFeedbackController
+        field={query.field}
+        scopeId="edit-racha-page"
+        status={query.status}
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
@@ -79,6 +89,10 @@ export default async function EditRachaPage({
           </h1>
         </div>
         <div className="flex gap-3">
+          <Button asChild href={`/dashboard/rachas/${racha.id}/sorteio`}>
+            <Shuffle className="h-4 w-4" />
+            Sortear times
+          </Button>
           <Button asChild href={`/rachas/${racha.slug}`} variant="outline">
             Ver página pública
           </Button>
@@ -190,19 +204,6 @@ export default async function EditRachaPage({
           enrollments={racha.enrollments}
           modality={racha.modality}
           rachaId={racha.id}
-        />
-
-        <TeamDrawModule
-          enrollments={confirmedEnrollments.map((item) => ({
-            id: item.id,
-            participantName: item.participantName,
-            participantPosition: item.participantPosition,
-            participantLevel: item.participantLevel,
-          }))}
-          futebolType={racha.futebolType}
-          modality={racha.modality}
-          rachaTitle={racha.title}
-          voleiType={racha.voleiType}
         />
       </section>
     </div>

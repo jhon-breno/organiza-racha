@@ -1,5 +1,6 @@
 import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { getParticipantLevelScore } from "@/lib/participant-level";
+import { formatDateTimeShort } from "@/lib/utils";
 
 export type TeamDrawParticipant = {
   id: string;
@@ -149,7 +150,7 @@ export function drawBalancedTeams({
   const targetSizes = buildTargetSizes(linePlayers.length, teamCount);
   const teams: DrawTeam[] = Array.from({ length: teamCount }, (_, index) => ({
     id: `team-${index + 1}`,
-    name: `Time ${String.fromCharCode(65 + index)}`,
+    name: `Time ${index + 1}`,
     players: [],
     goalkeepers: [],
     totalScore: 0,
@@ -199,8 +200,18 @@ export function drawBalancedTeams({
   return teams;
 }
 
-export function buildTeamDrawMessage(rachaTitle: string, teams: DrawTeam[]) {
-  let message = `*${rachaTitle}* - Sorteio de times\n\n`;
+export function buildTeamDrawMessage(
+  rachaTitle: string,
+  teams: DrawTeam[],
+  drawnAt?: Date,
+) {
+  let message = `*${rachaTitle}* - Sorteio de times\n`;
+
+  if (drawnAt) {
+    message += `Realizado em: ${formatDateTimeShort(drawnAt)}\n`;
+  }
+
+  message += "\n";
 
   teams.forEach((team) => {
     message += `*${team.name}* (${team.totalScore} pts)\n`;

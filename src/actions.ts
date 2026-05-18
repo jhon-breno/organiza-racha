@@ -14,8 +14,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured, signIn, signOut } from "@/auth";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { participantLevelValues } from "@/lib/participant-level";
 import { prisma } from "@/lib/prisma";
 import {
+  bulkOrganizerEnrollmentSchema,
   cancelPendingEnrollmentSchema,
   combineDateAndTime,
   credentialsSignInSchema,
@@ -66,6 +68,10 @@ function normalizePhoneValue(phone: string) {
 
 function normalizeEmailValue(email: string) {
   return email.trim().toLowerCase();
+}
+
+function hasPixConfiguration(pixKey?: string | null) {
+  return Boolean(pixKey?.trim());
 }
 
 function maskEmail(email: string) {
@@ -140,6 +146,246 @@ async function hasDuplicatedPhoneEnrollment(
     (enrollment) =>
       normalizePhoneValue(enrollment.participantPhone) === normalizedPhone,
   );
+}
+
+async function getOrCreateParticipantUser(input: {
+  name: string;
+  phone: string;
+}) {
+  const existingUser = await prisma.user.findUnique({
+    where: { phone: input.phone },
+    select: { id: true, name: true },
+  });
+
+  if (existingUser) {
+    if (!existingUser.name?.trim() && input.name.trim()) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { name: input.name.trim() },
+      });
+    }
+
+    return existingUser;
+  }
+
+  try {
+    return await prisma.user.create({
+      data: {
+        name: input.name,
+        phone: input.phone,
+      },
+      select: { id: true, name: true },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const userCreatedInParallel = await prisma.user.findUnique({
+        where: { phone: input.phone },
+        select: { id: true, name: true },
+      });
+
+      if (userCreatedInParallel) {
+        return userCreatedInParallel;
+      }
+    }
+
+    throw error;
+  }
+}
+
+function normalizeTextValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeBulkParticipantLevel(level: string) {
+  const normalized = normalizeTextValue(level).replace(/[^a-z0-9]/g, "");
+
+  const levelMap: Record<string, string> = {
+    "1": "STAR_1",
+    "1estrela": "STAR_1",
+    "1estrelas": "STAR_1",
+    star1: "STAR_1",
+    "2": "STAR_2",
+    "2estrela": "STAR_2",
+    "2estrelas": "STAR_2",
+    star2: "STAR_2",
+    "3": "STAR_3",
+    "3estrela": "STAR_3",
+    "3estrelas": "STAR_3",
+    star3: "STAR_3",
+    "4": "STAR_4",
+    "4estrela": "STAR_4",
+    "4estrelas": "STAR_4",
+    star4: "STAR_4",
+    "5": "STAR_5",
+    "5estrela": "STAR_5",
+    "5estrelas": "STAR_5",
+    star5: "STAR_5",
+    iniciante: "INICIANTE",
+    intermediario: "INTERMEDIARIO",
+    avancado: "AVANCADO",
+  };
+
+  return levelMap[normalized];
+}
+
+function normalizeBulkParticipantPosition(position: string) {
+  const rawValue = position.trim();
+
+  if (!rawValue) {
+    return "Versátil";
+  }
+
+  const normalized = normalizeTextValue(rawValue).replace(/[^a-z]/g, "");
+
+  if (normalized === "versatil" || normalized === "versatio") {
+    return "Versátil";
+  }
+
+  return rawValue;
+}
+
+function isBulkHeaderLine(columns: string[]) {
+  const normalizedColumns = columns.map((value) =>
+    normalizeTextValue(value).replace(/[^a-z]/g, ""),
+  );
+
+  return (
+    normalizedColumns[0] === "nome" &&
+    normalizedColumns[1] === "telefone" &&
+    normalizedColumns[2] === "nivel" &&
+    (normalizedColumns[3] === undefined ||
+      normalizedColumns[3] === "funcao" ||
+      normalizedColumns[3] === "posicao")
+  );
+}
+
+async function createOrganizerEnrollmentForRacha(input: {
+  racha: {
+    id: string;
+    slug: string;
+    modality: string;
+    organizerId: string;
+    eventDate: Date;
+    athleteLimit: number;
+    goalkeeperLimit: number | null;
+    hasFixedSetter: boolean;
+    setterLimit: number | null;
+  };
+  enrollment: {
+    participantName: string;
+    participantPhone: string;
+    participantPosition: string;
+    participantLevel: (typeof participantLevelValues)[number];
+    notes?: string;
+  };
+}) {
+  const isGoalkeeperEnrollment =
+    input.racha.modality === "FUTEBOL" &&
+    isGoalkeeperPosition(input.enrollment.participantPosition);
+
+  const duplicatedPhone = await hasDuplicatedPhoneEnrollment(
+    input.racha.id,
+    input.enrollment.participantPhone,
+  );
+
+  if (duplicatedPhone) {
+    throw new Error(
+      "O telefone informado ja esta inscrito no racha. Verifique antes de importar novamente.",
+    );
+  }
+
+  if (
+    input.racha.modality === "FUTEBOL" &&
+    input.enrollment.participantPosition === "Goleiro" &&
+    input.racha.goalkeeperLimit
+  ) {
+    const goalkeeperCount = await prisma.enrollment.count({
+      where: {
+        rachaId: input.racha.id,
+        status: ParticipantStatus.ACTIVE,
+        participantPosition: "Goleiro",
+      },
+    });
+
+    if (goalkeeperCount >= input.racha.goalkeeperLimit) {
+      throw new Error(
+        "Nao ha mais vagas para goleiro. Ajuste a funcao do participante.",
+      );
+    }
+  }
+
+  if (
+    input.racha.modality === "VOLEI" &&
+    input.enrollment.participantPosition === "Levantador" &&
+    input.racha.hasFixedSetter &&
+    input.racha.setterLimit
+  ) {
+    const setterCount = await prisma.enrollment.count({
+      where: {
+        rachaId: input.racha.id,
+        status: ParticipantStatus.ACTIVE,
+        participantPosition: "Levantador",
+      },
+    });
+
+    if (setterCount >= input.racha.setterLimit) {
+      throw new Error(
+        "Nao ha mais vagas de levantador fixo. Ajuste a funcao do participante.",
+      );
+    }
+  }
+
+  const confirmedCount = await prisma.enrollment.count({
+    where: {
+      rachaId: input.racha.id,
+      status: ParticipantStatus.ACTIVE,
+      participantPosition: {
+        not: "Goleiro",
+      },
+    },
+  });
+
+  const nextStatus =
+    !isGoalkeeperEnrollment && confirmedCount >= input.racha.athleteLimit
+      ? ParticipantStatus.WAITLIST
+      : ParticipantStatus.ACTIVE;
+  const nextPaymentStatus = isGoalkeeperEnrollment
+    ? PaymentStatus.PAID
+    : PaymentStatus.PENDING;
+  const nextPixPaid = isGoalkeeperEnrollment;
+  const normalizedPhone = normalizePhoneValue(input.enrollment.participantPhone);
+  const participantUser = await getOrCreateParticipantUser({
+    name: input.enrollment.participantName,
+    phone: normalizedPhone,
+  });
+
+  await prisma.enrollment.create({
+    data: {
+      rachaId: input.racha.id,
+      userId: participantUser.id,
+      participantName: input.enrollment.participantName,
+      participantPhone: normalizedPhone,
+      participantPosition: input.enrollment.participantPosition,
+      participantLevel: input.enrollment.participantLevel,
+      acceptedRules: true,
+      pixPaid: nextPixPaid,
+      notes: input.enrollment.notes || null,
+      status: nextStatus,
+      paymentStatus: nextPaymentStatus,
+    },
+  });
+
+  return {
+    nextStatus,
+    isGoalkeeperEnrollment,
+  };
 }
 
 type ValidatePrivateAccessKeyState = {
@@ -627,12 +873,14 @@ export async function updateOrganizerDataSettingsAction(formData: FormData) {
   });
 
   if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
     redirect(
       buildMessageUrl(
         "/dashboard",
         "error",
         parsed.error.issues[0]?.message ??
           "Não foi possível atualizar suas configurações.",
+        { field },
       ),
     );
   }
@@ -674,27 +922,42 @@ export async function updateOrganizerPixSettingsAction(formData: FormData) {
   });
 
   if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
     redirect(
       buildMessageUrl(
         "/dashboard",
         "error",
         parsed.error.issues[0]?.message ??
           "Não foi possível atualizar as configurações de PIX.",
+        { field },
       ),
     );
   }
 
+  const normalizedPixKey = parsed.data.pixKey?.trim() || "";
+
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      pixKey: parsed.data.pixKey || null,
+      pixKey: normalizedPixKey || null,
       pixBankName: parsed.data.pixBankName || null,
       pixHolderName: parsed.data.pixHolderName || null,
     },
   });
 
+  await prisma.racha.updateMany({
+    where: {
+      organizerId: user.id,
+      status: "PUBLISHED",
+    },
+    data: {
+      pixKey: normalizedPixKey,
+    },
+  });
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/rachas/new");
+  revalidatePath("/");
 
   redirect(
     buildMessageUrl(
@@ -765,20 +1028,10 @@ export async function createRachaAction(formData: FormData) {
       : null;
   const slug = await generateUniqueSlug(parsed.data.title);
   const organizerSettings = await getOrganizerRachaSettings(user.id);
-
-  if (
-    !organizerSettings?.organizerDisplayName ||
-    !organizerSettings.phoneWhatsapp ||
-    !organizerSettings.pixKey
-  ) {
-    redirect(
-      buildMessageUrl(
-        "/dashboard",
-        "error",
-        "Antes de criar um racha, configure apelido/nome, telefone e chave PIX no painel do organizador.",
-      ),
-    );
-  }
+  const organizerDisplayName =
+    organizerSettings?.organizerDisplayName || user.name?.trim() || "Organizador";
+  const phoneWhatsapp = organizerSettings?.phoneWhatsapp || "";
+  const pixKey = organizerSettings?.pixKey || "";
 
   await prisma.racha.create({
     data: {
@@ -797,10 +1050,10 @@ export async function createRachaAction(formData: FormData) {
         parsed.data.mapsQuery ||
         `${parsed.data.locationName}, ${parsed.data.address}, ${parsed.data.city}`,
       priceInCents: Math.round(parsed.data.price * 100),
-      organizerDisplayName: organizerSettings.organizerDisplayName,
-      phoneWhatsapp: organizerSettings.phoneWhatsapp,
+      organizerDisplayName,
+      phoneWhatsapp,
       whatsappGroupUrl: parsed.data.whatsappGroupUrl || null,
-      pixKey: organizerSettings.pixKey,
+      pixKey,
       coverImageUrl: parsed.data.coverImageUrl || null,
       profileImageUrl: parsed.data.profileImageUrl || user.image || null,
       visibility: parsed.data.visibility,
@@ -823,7 +1076,13 @@ export async function createRachaAction(formData: FormData) {
   revalidatePath("/dashboard");
 
   redirect(
-    buildMessageUrl("/dashboard", "success", "Racha criado com sucesso."),
+    buildMessageUrl(
+      "/dashboard",
+      "success",
+      hasPixConfiguration(pixKey)
+        ? "Racha criado com sucesso."
+        : "Racha criado com sucesso. Configure a chave PIX para publicar e liberar inscricoes.",
+    ),
   );
 }
 
@@ -896,20 +1155,10 @@ export async function updateRachaAction(formData: FormData) {
       : null;
   const slug = await generateUniqueSlug(parsed.data.title, id);
   const organizerSettings = await getOrganizerRachaSettings(user.id);
-
-  if (
-    !organizerSettings?.organizerDisplayName ||
-    !organizerSettings.phoneWhatsapp ||
-    !organizerSettings.pixKey
-  ) {
-    redirect(
-      buildMessageUrl(
-        "/dashboard",
-        "error",
-        "Antes de atualizar um racha, configure apelido/nome, telefone e chave PIX no painel do organizador.",
-      ),
-    );
-  }
+  const organizerDisplayName =
+    organizerSettings?.organizerDisplayName || user.name?.trim() || "Organizador";
+  const phoneWhatsapp = organizerSettings?.phoneWhatsapp || "";
+  const pixKey = organizerSettings?.pixKey || "";
 
   await prisma.racha.update({
     where: { id },
@@ -929,10 +1178,10 @@ export async function updateRachaAction(formData: FormData) {
         parsed.data.mapsQuery ||
         `${parsed.data.locationName}, ${parsed.data.address}, ${parsed.data.city}`,
       priceInCents: Math.round(parsed.data.price * 100),
-      organizerDisplayName: organizerSettings.organizerDisplayName,
-      phoneWhatsapp: organizerSettings.phoneWhatsapp,
+      organizerDisplayName,
+      phoneWhatsapp,
       whatsappGroupUrl: parsed.data.whatsappGroupUrl || null,
-      pixKey: organizerSettings.pixKey,
+      pixKey,
       coverImageUrl: parsed.data.coverImageUrl || null,
       profileImageUrl: parsed.data.profileImageUrl || user.image || null,
       visibility: parsed.data.visibility,
@@ -959,7 +1208,9 @@ export async function updateRachaAction(formData: FormData) {
     buildMessageUrl(
       `/dashboard/rachas/${id}/edit`,
       "success",
-      "Racha atualizado com sucesso.",
+      hasPixConfiguration(pixKey)
+        ? "Racha atualizado com sucesso."
+        : "Racha atualizado com sucesso. Configure a chave PIX para publicar e liberar inscricoes.",
     ),
   );
 }
@@ -1028,6 +1279,16 @@ export async function joinRachaAction(formData: FormData) {
 
   if (!racha) {
     redirect(buildMessageUrl("/", "error", "Racha não encontrado."));
+  }
+
+  if (!hasPixConfiguration(racha.pixKey)) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Este racha ainda nao esta publicado para inscricoes. O organizador precisa configurar a chave PIX.",
+      ),
+    );
   }
 
   if (racha.paymentDeadline && new Date() > racha.paymentDeadline) {
@@ -1263,12 +1524,14 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
   const callbackUrl = `/dashboard/rachas/${rachaId}/edit`;
 
   if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
     redirect(
       buildMessageUrl(
         callbackUrl,
         "error",
         parsed.error.issues[0]?.message ??
           "Não foi possível adicionar o participante.",
+        { field },
       ),
     );
   }
@@ -1295,111 +1558,26 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
     racha.modality === "FUTEBOL" &&
     isGoalkeeperPosition(parsed.data.participantPosition);
 
-  const duplicatedPhone = await hasDuplicatedPhoneEnrollment(
-    parsed.data.rachaId,
-    parsed.data.participantPhone,
-  );
+  let nextStatus: ParticipantStatus = ParticipantStatus.ACTIVE;
 
-  if (duplicatedPhone) {
+  try {
+    const result = await createOrganizerEnrollmentForRacha({
+      racha,
+      enrollment: parsed.data,
+    });
+
+    nextStatus = result.nextStatus;
+  } catch (error) {
     redirect(
       buildMessageUrl(
         callbackUrl,
         "error",
-        "O telefone informado já está inscrito no racha. Por favor, verifique o telefone ou veja se você já está incluso.",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível adicionar o participante.",
       ),
     );
   }
-
-  if (
-    racha.modality === "FUTEBOL" &&
-    parsed.data.participantPosition === "Goleiro" &&
-    racha.goalkeeperLimit
-  ) {
-    const goalkeeperCount = await prisma.enrollment.count({
-      where: {
-        rachaId: parsed.data.rachaId,
-        status: ParticipantStatus.ACTIVE,
-        participantPosition: "Goleiro",
-      },
-    });
-
-    if (goalkeeperCount >= racha.goalkeeperLimit) {
-      redirect(
-        buildMessageUrl(
-          callbackUrl,
-          "error",
-          "Não há mais vagas para goleiro. Selecione uma posição de linha.",
-        ),
-      );
-    }
-  }
-
-  if (
-    racha.modality === "VOLEI" &&
-    parsed.data.participantPosition === "Levantador" &&
-    racha.hasFixedSetter &&
-    racha.setterLimit
-  ) {
-    const setterCount = await prisma.enrollment.count({
-      where: {
-        rachaId: parsed.data.rachaId,
-        status: ParticipantStatus.ACTIVE,
-        participantPosition: "Levantador",
-      },
-    });
-
-    if (setterCount >= racha.setterLimit) {
-      redirect(
-        buildMessageUrl(
-          callbackUrl,
-          "error",
-          "Não há mais vagas de levantador fixo. Selecione outra posição.",
-        ),
-      );
-    }
-  }
-
-  const confirmedCount = await prisma.enrollment.count({
-    where: {
-      rachaId: parsed.data.rachaId,
-      status: ParticipantStatus.ACTIVE,
-      participantPosition: {
-        not: "Goleiro",
-      },
-    },
-  });
-
-  const nextStatus =
-    !isGoalkeeperEnrollment && confirmedCount >= racha.athleteLimit
-      ? ParticipantStatus.WAITLIST
-      : ParticipantStatus.ACTIVE;
-  const nextPaymentStatus = isGoalkeeperEnrollment
-    ? PaymentStatus.PAID
-    : PaymentStatus.PENDING;
-  const nextPixPaid = isGoalkeeperEnrollment;
-
-  const participantUser = await prisma.user.create({
-    data: {
-      name: parsed.data.participantName,
-      phone: parsed.data.participantPhone,
-    },
-  });
-
-  await prisma.enrollment.create({
-    data: {
-      rachaId: parsed.data.rachaId,
-      userId: participantUser.id,
-      participantName: parsed.data.participantName,
-      participantPhone: parsed.data.participantPhone,
-      participantPosition: parsed.data.participantPosition,
-      participantLevel: parsed.data.participantLevel,
-      acceptedRules: true,
-      pixPaid: nextPixPaid,
-      notes: parsed.data.notes || null,
-      status: nextStatus,
-      paymentStatus: nextPaymentStatus,
-    },
-  });
 
   revalidatePath("/dashboard");
   revalidatePath(callbackUrl);
@@ -1414,6 +1592,177 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
         : isGoalkeeperEnrollment
           ? "Goleiro incluído e confirmado com sucesso."
           : "Participante incluído com sucesso.",
+    ),
+  );
+}
+
+export async function bulkAddOrganizerEnrollmentsAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const rachaId = getStringValue(formData, "rachaId");
+  const callbackUrl = `/dashboard/rachas/${rachaId}/edit`;
+
+  const parsed = bulkOrganizerEnrollmentSchema.safeParse({
+    rachaId,
+    bulkEntries: getStringValue(formData, "bulkEntries"),
+  });
+
+  if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
+
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível importar os participantes.",
+        { field },
+      ),
+    );
+  }
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: parsed.data.rachaId },
+  });
+
+  if (!racha || racha.organizerId !== user.id) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
+  }
+
+  if (racha.eventDate <= new Date()) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Este racha já aconteceu ou foi encerrado.",
+        { field: "bulkEntries" },
+      ),
+    );
+  }
+
+  const rawLines = parsed.data.bulkEntries
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const lines =
+    rawLines.length > 0 && isBulkHeaderLine(rawLines[0].split(";"))
+      ? rawLines.slice(1)
+      : rawLines;
+
+  if (lines.length === 0) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Nenhuma linha valida foi encontrada para importar.",
+        { field: "bulkEntries" },
+      ),
+    );
+  }
+
+  let importedCount = 0;
+  let waitlistCount = 0;
+  let goalkeeperCount = 0;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    const columns = line.split(";").map((value) => value.trim());
+
+    if (columns.length < 3) {
+      redirect(
+        buildMessageUrl(
+          callbackUrl,
+          "error",
+          `Linha ${index + 1}: use o formato nome;telefone;nivel;funcao.`,
+          { field: "bulkEntries" },
+        ),
+      );
+    }
+
+    const participantName = columns[0] ?? "";
+    const participantPhone = columns[1] ?? "";
+    const participantLevel = normalizeBulkParticipantLevel(columns[2] ?? "");
+    const participantPosition = normalizeBulkParticipantPosition(
+      columns[3] ?? "",
+    );
+
+    if (!participantLevel) {
+      redirect(
+        buildMessageUrl(
+          callbackUrl,
+          "error",
+          `Linha ${index + 1}: nivel invalido. Use 1 a 5 estrelas ou STAR_1 a STAR_5.`,
+          { field: "bulkEntries" },
+        ),
+      );
+    }
+
+    const enrollmentParsed = organizerEnrollmentSchema.safeParse({
+      rachaId: parsed.data.rachaId,
+      participantName,
+      participantPhone,
+      participantPosition,
+      participantLevel,
+      notes: "",
+    });
+
+    if (!enrollmentParsed.success) {
+      redirect(
+        buildMessageUrl(
+          callbackUrl,
+          "error",
+          `Linha ${index + 1}: ${enrollmentParsed.error.issues[0]?.message ?? "dados invalidos."}`,
+          { field: "bulkEntries" },
+        ),
+      );
+    }
+
+    try {
+      const result = await createOrganizerEnrollmentForRacha({
+        racha,
+        enrollment: enrollmentParsed.data,
+      });
+
+      importedCount += 1;
+
+      if (result.nextStatus === ParticipantStatus.WAITLIST) {
+        waitlistCount += 1;
+      }
+
+      if (result.isGoalkeeperEnrollment) {
+        goalkeeperCount += 1;
+      }
+    } catch (error) {
+      redirect(
+        buildMessageUrl(
+          callbackUrl,
+          "error",
+          `Linha ${index + 1}: ${error instanceof Error ? error.message : "falha ao importar participante."}`,
+          { field: "bulkEntries" },
+        ),
+      );
+    }
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${racha.slug}`);
+
+  const summaryParts = [`${importedCount} participante(s) importado(s)`];
+
+  if (goalkeeperCount > 0) {
+    summaryParts.push(`${goalkeeperCount} goleiro(s) confirmado(s)`);
+  }
+
+  if (waitlistCount > 0) {
+    summaryParts.push(`${waitlistCount} na lista de espera`);
+  }
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      `${summaryParts.join(" • ")} com sucesso.`,
     ),
   );
 }

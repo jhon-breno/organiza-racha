@@ -218,6 +218,14 @@ export const organizerEnrollmentSchema = z.object({
     .or(z.literal("")),
 });
 
+export const bulkOrganizerEnrollmentSchema = z.object({
+  rachaId: z.string().min(1, "Racha inválido."),
+  bulkEntries: z
+    .string()
+    .trim()
+    .min(1, "Cole pelo menos uma linha para importar os participantes."),
+});
+
 export const refundRequestSchema = z.object({
   enrollmentId: z.string().min(1, "Inscrição inválida."),
   refundReason: z.string().min(3, "Informe o motivo do reembolso."),

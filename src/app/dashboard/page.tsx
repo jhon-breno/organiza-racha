@@ -10,6 +10,7 @@ import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
+import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { formatCurrencyFromCents, formatDateTimeShort } from "@/lib/utils";
 type SearchParams = Promise<{
   status?: string;
   message?: string;
+  field?: string;
 }>;
 
 export default async function DashboardPage({
@@ -144,7 +146,16 @@ export default async function DashboardPage({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+    <div
+      className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8"
+      id="dashboard-page"
+    >
+      <PageActionFeedbackController
+        field={params.field}
+        scopeId="dashboard-page"
+        status={params.status}
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
@@ -330,6 +341,11 @@ export default async function DashboardPage({
                       <Badge className="bg-slate-100 text-slate-700">
                         {racha.visibility === "PRIVATE" ? "Privado" : "Aberto"}
                       </Badge>
+                      {!racha.pixKey.trim() ? (
+                        <Badge className="bg-amber-100 text-amber-800">
+                          Aguardando PIX
+                        </Badge>
+                      ) : null}
                     </div>
                     <h2 className="text-2xl font-bold text-slate-950">
                       {racha.title}
@@ -339,6 +355,11 @@ export default async function DashboardPage({
                       {racha.locationName} •{" "}
                       {formatCurrencyFromCents(racha.priceInCents)}
                     </p>
+                    {!racha.pixKey.trim() ? (
+                      <p className="text-sm text-amber-700">
+                        Configure a chave PIX do organizador para publicar este racha e liberar inscricoes.
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap gap-3">
