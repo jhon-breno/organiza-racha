@@ -139,10 +139,10 @@ export function EnrollmentManagement({
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Nível
-            <Select defaultValue="INTERMEDIARIO" name="participantLevel">
+            <Select defaultValue="STAR_3" name="participantLevel">
               {levelOptions.map((level) => (
                 <option key={level.value} value={level.value}>
-                  {level.label}
+                  {level.visual} {level.label}
                 </option>
               ))}
             </Select>

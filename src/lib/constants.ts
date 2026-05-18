@@ -1,3 +1,9 @@
+import {
+  getParticipantLevelLabel,
+  getParticipantLevelVisual,
+  participantLevelOptions,
+} from "@/lib/participant-level";
+
 export const modalities = [
   { value: "FUTEBOL", label: "Futebol" },
   { value: "FUTSAL", label: "Futsal" },
@@ -74,11 +80,7 @@ export const visibilityOptions = [
   { value: "PRIVATE", label: "Privado com chave secreta" },
 ] as const;
 
-export const levelOptions = [
-  { value: "INICIANTE", label: "Iniciante" },
-  { value: "INTERMEDIARIO", label: "Intermediário" },
-  { value: "AVANCADO", label: "Avançado" },
-] as const;
+export const levelOptions = participantLevelOptions;
 
 export const positionOptionsFutebol = [
   "Goleiro",
@@ -135,7 +137,18 @@ export const visibilityLabels = Object.fromEntries(
 ) as Record<string, string>;
 
 export const levelLabels = Object.fromEntries(
-  levelOptions.map((item) => [item.value, item.label]),
+  [
+    ...participantLevelOptions.map((item) => [
+      item.value,
+      `${item.visual} ${item.label}`,
+    ]),
+    ["INICIANTE", `${getParticipantLevelVisual("INICIANTE")} ${getParticipantLevelLabel("INICIANTE")}`],
+    [
+      "INTERMEDIARIO",
+      `${getParticipantLevelVisual("INTERMEDIARIO")} ${getParticipantLevelLabel("INTERMEDIARIO")}`,
+    ],
+    ["AVANCADO", `${getParticipantLevelVisual("AVANCADO")} ${getParticipantLevelLabel("AVANCADO")}`],
+  ],
 ) as Record<string, string>;
 
 export const participantStatusLabels: Record<string, string> = {

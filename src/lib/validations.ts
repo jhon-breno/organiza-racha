@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { participantLevelValues } from "@/lib/participant-level";
 import { createDateInAppTimeZone } from "@/lib/utils";
 
 function isEmailValue(value: string) {
@@ -169,7 +170,7 @@ export const enrollmentSchema = z.object({
   participantName: z.string().min(2, "Informe seu nome."),
   participantPhone: z.string().min(8, "Informe um telefone válido."),
   participantPosition: z.string().min(2, "Informe sua posição."),
-  participantLevel: z.enum(["INICIANTE", "INTERMEDIARIO", "AVANCADO"]),
+  participantLevel: z.enum(participantLevelValues),
   notes: z
     .string()
     .max(280, "Observações com no máximo 280 caracteres.")
@@ -197,7 +198,7 @@ export const organizerEnrollmentSchema = z.object({
   participantName: z.string().min(2, "Informe o nome do participante."),
   participantPhone: z.string().min(8, "Informe um telefone válido."),
   participantPosition: z.string().min(2, "Informe a posição do participante."),
-  participantLevel: z.enum(["INICIANTE", "INTERMEDIARIO", "AVANCADO"]),
+  participantLevel: z.enum(participantLevelValues),
   notes: z
     .string()
     .max(280, "Observações com no máximo 280 caracteres.")

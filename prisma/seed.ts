@@ -98,7 +98,7 @@ async function main() {
       participantName: player.name ?? "Carlos Participante",
       participantPhone: player.phone ?? "11988887777",
       participantPosition: "Meio-campo",
-      participantLevel: ParticipantLevel.INTERMEDIARIO,
+      participantLevel: ParticipantLevel.STAR_3,
       acceptedRules: true,
       pixPaid: true,
       notes: "Posso chegar 15 minutos antes.",

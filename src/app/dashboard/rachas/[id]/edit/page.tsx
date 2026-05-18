@@ -7,6 +7,7 @@ import { EnrollmentManagement } from "@/components/enrollment-management";
 import { FlashMessage } from "@/components/flash-message";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { RachaForm } from "@/components/racha-form";
+import { TeamDrawModule } from "@/components/team-draw-module";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -189,6 +190,19 @@ export default async function EditRachaPage({
           enrollments={racha.enrollments}
           modality={racha.modality}
           rachaId={racha.id}
+        />
+
+        <TeamDrawModule
+          enrollments={confirmedEnrollments.map((item) => ({
+            id: item.id,
+            participantName: item.participantName,
+            participantPosition: item.participantPosition,
+            participantLevel: item.participantLevel,
+          }))}
+          futebolType={racha.futebolType}
+          modality={racha.modality}
+          rachaTitle={racha.title}
+          voleiType={racha.voleiType}
         />
       </section>
     </div>
