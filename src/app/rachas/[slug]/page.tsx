@@ -23,6 +23,7 @@ import {
   getRachaCoverImageUrl,
   getInitials,
 } from "@/lib/utils";
+import { isConfirmedEnrollment, isGoalkeeperEnrollment } from "@/lib/enrollment";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<{ status?: string; message?: string }>;
@@ -85,7 +86,7 @@ export default async function RachaDetailsPage({
       })
     : null;
   const confirmedPaidParticipants = racha.enrollments.filter(
-    (item) => item.status === "ACTIVE" && item.paymentStatus === "PAID",
+    (item) => isConfirmedEnrollment(item) && !isGoalkeeperEnrollment(item),
   );
   const coverImageUrl = getRachaCoverImageUrl(
     racha.modality,

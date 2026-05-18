@@ -8,12 +8,14 @@ import {
 } from "@/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
+import { isGoalkeeperPosition } from "@/lib/enrollment";
 
 type MyEnrollmentActionsProps = {
   enrollmentId: string;
   rachaSlug: string;
   enrollmentStatus: string;
   paymentStatus: string;
+  participantPosition: string;
   pixKey: string;
   paymentDeadline?: string | null;
 };
@@ -23,6 +25,7 @@ export function MyEnrollmentActions({
   rachaSlug,
   enrollmentStatus,
   paymentStatus,
+  participantPosition,
   pixKey,
   paymentDeadline,
 }: MyEnrollmentActionsProps) {
@@ -37,11 +40,13 @@ export function MyEnrollmentActions({
     null,
   );
 
-  const canPay = paymentStatus === "PENDING" && enrollmentStatus !== "CANCELED";
+  const isGoalkeeper = isGoalkeeperPosition(participantPosition);
+  const canPay =
+    !isGoalkeeper && paymentStatus === "PENDING" && enrollmentStatus !== "CANCELED";
   const canCancelPending =
-    paymentStatus === "PENDING" && enrollmentStatus !== "CANCELED";
+    enrollmentStatus !== "CANCELED" && (isGoalkeeper || paymentStatus === "PENDING");
   const canRequestRefund =
-    paymentStatus === "PAID" && enrollmentStatus !== "CANCELED";
+    !isGoalkeeper && paymentStatus === "PAID" && enrollmentStatus !== "CANCELED";
 
   const modalTitle = useMemo(() => {
     if (isPaymentModalOpen) {

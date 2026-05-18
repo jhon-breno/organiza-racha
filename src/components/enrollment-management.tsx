@@ -16,9 +16,14 @@ import {
   positionOptionsFutebol,
   positionOptionsVolei,
 } from "@/lib/constants";
+import {
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+} from "@/lib/enrollment";
 import { formatDateTimeShort } from "@/lib/utils";
 
 function getUnifiedEnrollmentStatus(enrollment: {
+  participantPosition?: string;
   status: string;
   paymentStatus: string;
 }) {
@@ -46,7 +51,7 @@ function getUnifiedEnrollmentStatus(enrollment: {
     };
   }
 
-  if (enrollment.paymentStatus === "PAID") {
+  if (isConfirmedEnrollment(enrollment)) {
     return {
       label: "Confirmado",
       badgeClassName: "bg-emerald-100 text-emerald-700",
@@ -196,8 +201,9 @@ export function EnrollmentManagement({
               </div>
 
               <div className="flex flex-wrap gap-3">
-                {enrollment.paymentStatus === "PENDING" ||
-                enrollment.paymentStatus === "PROOF_SENT" ? (
+                {!isGoalkeeperEnrollment(enrollment) &&
+                (enrollment.paymentStatus === "PENDING" ||
+                  enrollment.paymentStatus === "PROOF_SENT") ? (
                   <form action={confirmEnrollmentPaymentAction}>
                     <input
                       name="enrollmentId"

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  ParticipantStatus,
-  PaymentStatus,
-  Racha,
-  Enrollment,
-} from "@prisma/client";
+import { Racha, Enrollment } from "@prisma/client";
 import { levelLabels } from "@/lib/constants";
+import {
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+  isVisibleEnrollment,
+} from "@/lib/enrollment";
 import { formatDateTimeShort } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -48,17 +48,9 @@ export async function GET(request: NextRequest) {
     let enrollments = racha.enrollments;
 
     if (type === "confirmed") {
-      enrollments = enrollments.filter(
-        (item) =>
-          item.status === ParticipantStatus.ACTIVE &&
-          item.paymentStatus === PaymentStatus.PAID,
-      );
+      enrollments = enrollments.filter(isConfirmedEnrollment);
     } else if (type === "all") {
-      enrollments = enrollments.filter(
-        (item) =>
-          item.status !== ParticipantStatus.CANCELED &&
-          item.paymentStatus !== PaymentStatus.REFUNDED,
-      );
+      enrollments = enrollments.filter(isVisibleEnrollment);
     }
 
     if (format === "excel") {
@@ -73,6 +65,7 @@ export async function GET(request: NextRequest) {
 }
 
 function getStatusLabel(enrollment: {
+  participantPosition?: string | null;
   status: string;
   paymentStatus: string;
 }): string {
@@ -88,25 +81,24 @@ function getStatusLabel(enrollment: {
   if (enrollment.status === "WAITLIST") {
     return "Lista de espera";
   }
-  if (
-    enrollment.status === ParticipantStatus.ACTIVE &&
-    enrollment.paymentStatus === PaymentStatus.PAID
-  ) {
+  if (isConfirmedEnrollment(enrollment)) {
     return "Confirmado";
   }
-  if (
-    enrollment.status === ParticipantStatus.ACTIVE &&
-    enrollment.paymentStatus === PaymentStatus.PENDING
-  ) {
+  if (enrollment.status === "ACTIVE" && enrollment.paymentStatus === "PENDING") {
     return "Aguardando pagamento";
   }
-  if (
-    enrollment.status === ParticipantStatus.ACTIVE &&
-    enrollment.paymentStatus === PaymentStatus.PROOF_SENT
-  ) {
+  if (enrollment.status === "ACTIVE" && enrollment.paymentStatus === "PROOF_SENT") {
     return "Pagamento em análise";
   }
   return "Pendente";
+}
+
+function getLineEnrollments(enrollments: Enrollment[]) {
+  return enrollments.filter((item) => !isGoalkeeperEnrollment(item));
+}
+
+function getGoalkeeperEnrollments(enrollments: Enrollment[]) {
+  return enrollments.filter(isGoalkeeperEnrollment);
 }
 
 function generateExcel(
@@ -114,8 +106,8 @@ function generateExcel(
   enrollments: Enrollment[],
   type: string,
 ): NextResponse {
-  // Criar CSV simples (compatível com Excel)
   const headers = [
+    "Categoria",
     "Posição",
     "Nome",
     "Telefone",
@@ -124,15 +116,46 @@ function generateExcel(
     "Status",
   ];
 
-  const rows = enrollments.map((enrollment, index) => [
-    (index + 1).toString(),
-    enrollment.participantName,
-    enrollment.participantPhone,
-    enrollment.participantPosition,
-    levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
-      enrollment.participantLevel,
-    getStatusLabel(enrollment),
-  ]);
+  const lineEnrollments = getLineEnrollments(enrollments);
+  const goalkeeperEnrollments = getGoalkeeperEnrollments(enrollments);
+  const goalkeeperSlots = Math.max(
+    racha.goalkeeperLimit ?? 0,
+    goalkeeperEnrollments.length,
+  );
+  const rows = [
+    ...Array.from({ length: racha.athleteLimit }, (_, index) => {
+      const enrollment = lineEnrollments[index];
+
+      return [
+        "Atleta",
+        (index + 1).toString(),
+        enrollment?.participantName ?? "",
+        enrollment?.participantPhone ?? "",
+        enrollment?.participantPosition ?? "",
+        enrollment
+          ? levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
+            enrollment.participantLevel
+          : "",
+        enrollment ? getStatusLabel(enrollment) : "",
+      ];
+    }),
+    ...Array.from({ length: goalkeeperSlots }, (_, index) => {
+      const enrollment = goalkeeperEnrollments[index];
+
+      return [
+        "Goleiro",
+        (index + 1).toString(),
+        enrollment?.participantName ?? "",
+        enrollment?.participantPhone ?? "",
+        enrollment?.participantPosition ?? "Goleiro",
+        enrollment
+          ? levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
+            enrollment.participantLevel
+          : "",
+        enrollment ? getStatusLabel(enrollment) : "",
+      ];
+    }),
+  ];
 
   const csv = [
     `Racha: ${racha.title}`,
@@ -164,30 +187,17 @@ async function generatePDF(
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 36;
-  const rowHeight = 18;
-
-  const columns = [
-    { label: "#", width: 24 },
-    { label: "Nome", width: 130 },
-    { label: "Telefone", width: 98 },
-    { label: "Posição", width: 96 },
-    { label: "Nível", width: 78 },
-    { label: "Status", width: 96 },
-  ] as const;
-
   const headerColor = rgb(0.12, 0.12, 0.12);
-  const borderColor = rgb(0.85, 0.85, 0.88);
-  const tableHeaderBg = rgb(0.95, 0.95, 0.95);
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
-
-  const truncate = (text: string, max = 24) => {
-    if (text.length <= max) {
-      return text;
-    }
-    return `${text.slice(0, max - 1)}…`;
-  };
+  const lineHeight = 14;
+  const lineEnrollments = getLineEnrollments(enrollments);
+  const goalkeeperEnrollments = getGoalkeeperEnrollments(enrollments);
+  const goalkeeperSlots = Math.max(
+    racha.goalkeeperLimit ?? 0,
+    goalkeeperEnrollments.length,
+  );
 
   const drawText = (
     text: string,
@@ -202,6 +212,18 @@ async function generatePDF(
       font: options?.bold ? fontBold : fontRegular,
       color: headerColor,
     });
+  };
+
+  const drawLine = (text: string, options?: { bold?: boolean; size?: number }) => {
+    drawText(text, margin, y, options);
+    y -= lineHeight;
+  };
+
+  const ensureSpace = (needed = 56) => {
+    if (y - needed < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
   };
 
   drawText(racha.title, margin, y, { bold: true, size: 18 });
@@ -220,63 +242,35 @@ async function generatePDF(
   );
   y -= 24;
 
-  const drawTableHeader = () => {
-    let x = margin;
-    columns.forEach((column) => {
-      page.drawRectangle({
-        x,
-        y: y - rowHeight + 4,
-        width: column.width,
-        height: rowHeight,
-        borderColor,
-        borderWidth: 1,
-        color: tableHeaderBg,
-      });
-      drawText(column.label, x + 3, y - 9, { bold: true, size: 9 });
-      x += column.width;
-    });
-    y -= rowHeight;
-  };
+  drawLine("Lista de atletas:", { bold: true, size: 11 });
+  for (let index = 0; index < racha.athleteLimit; index += 1) {
+    ensureSpace();
+    const enrollment = lineEnrollments[index];
 
-  drawTableHeader();
-
-  enrollments.forEach((enrollment, index) => {
-    if (y - rowHeight < margin) {
-      page = pdfDoc.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
-      drawTableHeader();
+    if (!enrollment) {
+      drawLine(`${index + 1} - `);
+      continue;
     }
 
-    const rowValues = [
-      String(index + 1),
-      truncate(enrollment.participantName, 26),
-      truncate(enrollment.participantPhone, 18),
-      truncate(enrollment.participantPosition, 16),
-      truncate(
-        levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
-          enrollment.participantLevel,
-        14,
-      ),
-      truncate(getStatusLabel(enrollment), 18),
-    ];
+    drawLine(
+      `${index + 1} - ${enrollment.participantName} (${getStatusLabel(enrollment)})`,
+    );
+  }
 
-    let x = margin;
-    rowValues.forEach((value, valueIndex) => {
-      const width = columns[valueIndex]!.width;
-      page.drawRectangle({
-        x,
-        y: y - rowHeight + 4,
-        width,
-        height: rowHeight,
-        borderColor,
-        borderWidth: 1,
-      });
-      drawText(value, x + 3, y - 9, { size: 8.5 });
-      x += width;
-    });
+  if (goalkeeperSlots > 0) {
+    y -= 8;
+    drawLine("Goleiros:", { bold: true, size: 11 });
 
-    y -= rowHeight;
-  });
+    for (let index = 0; index < goalkeeperSlots; index += 1) {
+      ensureSpace();
+      const enrollment = goalkeeperEnrollments[index];
+      drawLine(
+        enrollment
+          ? `${index + 1} - ${enrollment.participantName}`
+          : `${index + 1} - `,
+      );
+    }
+  }
 
   const bytes = await pdfDoc.save();
   const buffer = Buffer.from(bytes);

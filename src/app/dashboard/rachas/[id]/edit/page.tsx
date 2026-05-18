@@ -1,4 +1,4 @@
-import { PaymentStatus, ParticipantStatus } from "@prisma/client";
+import { ParticipantStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
@@ -9,6 +9,12 @@ import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { RachaForm } from "@/components/racha-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  isAwaitingPaymentEnrollment,
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+  isVisibleEnrollment,
+} from "@/lib/enrollment";
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ id: string }>;
@@ -44,21 +50,9 @@ export default async function EditRachaPage({
   }
 
   const editPageUrl = `/dashboard/rachas/${racha.id}/edit`;
-  const pendingPaymentStatuses: PaymentStatus[] = [
-    PaymentStatus.PENDING,
-    PaymentStatus.PROOF_SENT,
-  ];
-  const confirmedEnrollments = racha.enrollments.filter(
-    (item) =>
-      item.status === ParticipantStatus.ACTIVE &&
-      item.paymentStatus === PaymentStatus.PAID,
-  );
+  const confirmedEnrollments = racha.enrollments.filter(isConfirmedEnrollment);
   const pendingEnrollments = racha.enrollments
-    .filter(
-      (item) =>
-        item.status === ParticipantStatus.ACTIVE &&
-        pendingPaymentStatuses.includes(item.paymentStatus),
-    )
+    .filter(isAwaitingPaymentEnrollment)
     .map((item) => ({
       id: item.id,
       participantName: item.participantName,
@@ -69,9 +63,7 @@ export default async function EditRachaPage({
     (item) => item.status === ParticipantStatus.WAITLIST,
   ).length;
   const totalAthletes = racha.enrollments.filter(
-    (item) =>
-      item.status !== ParticipantStatus.CANCELED &&
-      item.paymentStatus !== PaymentStatus.REFUNDED,
+    (item) => isVisibleEnrollment(item) && !isGoalkeeperEnrollment(item),
   ).length;
 
   return (
@@ -133,6 +125,7 @@ export default async function EditRachaPage({
                   paymentStatus: item.paymentStatus,
                 }))}
                 athleteLimit={racha.athleteLimit}
+                goalkeeperLimit={racha.goalkeeperLimit}
                 whatsappGroupUrl={racha.whatsappGroupUrl}
               />
             </div>
@@ -184,6 +177,7 @@ export default async function EditRachaPage({
                   paymentStatus: item.paymentStatus,
                 }))}
                 athleteLimit={racha.athleteLimit}
+                goalkeeperLimit={racha.goalkeeperLimit}
                 slug={racha.slug}
                 whatsappGroupUrl={racha.whatsappGroupUrl}
               />

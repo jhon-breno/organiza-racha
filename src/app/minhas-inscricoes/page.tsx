@@ -143,6 +143,7 @@ export default async function MyEnrollmentsPage({
                   enrollmentId={enrollment.id}
                   enrollmentStatus={enrollment.status}
                   paymentStatus={enrollment.paymentStatus}
+                  participantPosition={enrollment.participantPosition}
                   paymentDeadline={paymentDeadlineLabel}
                   pixKey={enrollment.racha.pixKey}
                   rachaSlug={enrollment.racha.slug}

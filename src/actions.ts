@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured, signIn, signOut } from "@/auth";
+import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { prisma } from "@/lib/prisma";
 import {
   cancelPendingEnrollmentSchema,
@@ -1078,6 +1079,10 @@ export async function joinRachaAction(formData: FormData) {
     );
   }
 
+  const isGoalkeeperEnrollment =
+    racha.modality === "FUTEBOL" &&
+    isGoalkeeperPosition(parsed.data.participantPosition);
+
   // Validação de vagas por posição específica
   if (
     racha.modality === "FUTEBOL" &&
@@ -1175,13 +1180,20 @@ export async function joinRachaAction(formData: FormData) {
     where: {
       rachaId,
       status: ParticipantStatus.ACTIVE,
+      participantPosition: {
+        not: "Goleiro",
+      },
     },
   });
 
   const nextStatus =
-    confirmedCount >= racha.athleteLimit
+    !isGoalkeeperEnrollment && confirmedCount >= racha.athleteLimit
       ? ParticipantStatus.WAITLIST
       : ParticipantStatus.ACTIVE;
+  const nextPaymentStatus = isGoalkeeperEnrollment
+    ? PaymentStatus.PAID
+    : PaymentStatus.PENDING;
+  const nextPixPaid = isGoalkeeperEnrollment;
 
   if (existing) {
     await prisma.enrollment.update({
@@ -1192,10 +1204,10 @@ export async function joinRachaAction(formData: FormData) {
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
         acceptedRules: true,
-        pixPaid: false,
+        pixPaid: nextPixPaid,
         notes: parsed.data.notes || null,
         status: nextStatus,
-        paymentStatus: PaymentStatus.PENDING,
+        paymentStatus: nextPaymentStatus,
         canceledAt: null,
         refundRequestedAt: null,
       },
@@ -1210,10 +1222,10 @@ export async function joinRachaAction(formData: FormData) {
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
         acceptedRules: true,
-        pixPaid: false,
+        pixPaid: nextPixPaid,
         notes: parsed.data.notes || null,
         status: nextStatus,
-        paymentStatus: PaymentStatus.PENDING,
+        paymentStatus: nextPaymentStatus,
       },
     });
   }
@@ -1228,7 +1240,9 @@ export async function joinRachaAction(formData: FormData) {
       "success",
       nextStatus === ParticipantStatus.WAITLIST
         ? "Inscrição registrada na lista de espera. Acompanhe em Minhas inscrições."
-        : "Inscrição registrada com sucesso. Realize o pagamento para seguir no racha.",
+        : isGoalkeeperEnrollment
+          ? "Inscrição de goleiro confirmada com sucesso. Você já entrou na lista do racha."
+          : "Inscrição registrada com sucesso. Realize o pagamento para seguir no racha.",
     ),
   );
 }
@@ -1276,6 +1290,10 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
       ),
     );
   }
+
+  const isGoalkeeperEnrollment =
+    racha.modality === "FUTEBOL" &&
+    isGoalkeeperPosition(parsed.data.participantPosition);
 
   const duplicatedPhone = await hasDuplicatedPhoneEnrollment(
     parsed.data.rachaId,
@@ -1345,13 +1363,20 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
     where: {
       rachaId: parsed.data.rachaId,
       status: ParticipantStatus.ACTIVE,
+      participantPosition: {
+        not: "Goleiro",
+      },
     },
   });
 
   const nextStatus =
-    confirmedCount >= racha.athleteLimit
+    !isGoalkeeperEnrollment && confirmedCount >= racha.athleteLimit
       ? ParticipantStatus.WAITLIST
       : ParticipantStatus.ACTIVE;
+  const nextPaymentStatus = isGoalkeeperEnrollment
+    ? PaymentStatus.PAID
+    : PaymentStatus.PENDING;
+  const nextPixPaid = isGoalkeeperEnrollment;
 
   const participantUser = await prisma.user.create({
     data: {
@@ -1369,10 +1394,10 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
       participantPosition: parsed.data.participantPosition,
       participantLevel: parsed.data.participantLevel,
       acceptedRules: true,
-      pixPaid: false,
+      pixPaid: nextPixPaid,
       notes: parsed.data.notes || null,
       status: nextStatus,
-      paymentStatus: PaymentStatus.PENDING,
+      paymentStatus: nextPaymentStatus,
     },
   });
 
@@ -1386,7 +1411,9 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
       "success",
       nextStatus === ParticipantStatus.WAITLIST
         ? "Participante incluído na lista de espera com sucesso."
-        : "Participante incluído com sucesso.",
+        : isGoalkeeperEnrollment
+          ? "Goleiro incluído e confirmado com sucesso."
+          : "Participante incluído com sucesso.",
     ),
   );
 }

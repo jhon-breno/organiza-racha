@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { PaymentStatus, ParticipantStatus, Prisma } from "@prisma/client";
+import { ParticipantStatus, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import {
   updateOrganizerDataSettingsAction,
@@ -18,6 +18,12 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { modalityLabels } from "@/lib/constants";
+import {
+  isAwaitingPaymentEnrollment,
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+  isVisibleEnrollment,
+} from "@/lib/enrollment";
 import { prisma } from "@/lib/prisma";
 import { formatCurrencyFromCents, formatDateTimeShort } from "@/lib/utils";
 
@@ -119,24 +125,13 @@ export default async function DashboardPage({
     (total, racha) =>
       total +
       racha.enrollments.filter(
-        (item) =>
-          item.status === ParticipantStatus.ACTIVE &&
-          item.paymentStatus === PaymentStatus.PAID,
+        (item) => isConfirmedEnrollment(item) && !isGoalkeeperEnrollment(item),
       ).length,
     0,
   );
-  const pendingPaymentStatuses: PaymentStatus[] = [
-    PaymentStatus.PENDING,
-    PaymentStatus.PROOF_SENT,
-  ];
   const pendingParticipants = rachas.reduce(
     (total, racha) =>
-      total +
-      racha.enrollments.filter(
-        (item) =>
-          item.status === ParticipantStatus.ACTIVE &&
-          pendingPaymentStatuses.includes(item.paymentStatus),
-      ).length,
+      total + racha.enrollments.filter(isAwaitingPaymentEnrollment).length,
     0,
   );
   const refundRequests = rachas.reduce(
@@ -302,30 +297,18 @@ export default async function DashboardPage({
       ) : (
         <div className="grid gap-6">
           {rachas.map((racha) => {
-            const confirmedEnrollments = racha.enrollments.filter(
-              (item) =>
-                item.status === ParticipantStatus.ACTIVE &&
-                item.paymentStatus === PaymentStatus.PAID,
-            );
-            const confirmed = racha.enrollments.filter(
-              (item) =>
-                item.status === ParticipantStatus.ACTIVE &&
-                item.paymentStatus === PaymentStatus.PAID,
+            const confirmedEnrollments = racha.enrollments.filter(isConfirmedEnrollment);
+            const confirmed = confirmedEnrollments.filter(
+              (item) => !isGoalkeeperEnrollment(item),
             ).length;
             const awaitingPayment = racha.enrollments.filter(
-              (item) =>
-                item.status === ParticipantStatus.ACTIVE &&
-                pendingPaymentStatuses.includes(item.paymentStatus),
+              isAwaitingPaymentEnrollment,
             ).length;
             const waitlist = racha.enrollments.filter(
               (item) => item.status === ParticipantStatus.WAITLIST,
             ).length;
             const pendingEnrollments = racha.enrollments
-              .filter(
-                (item) =>
-                  item.status === ParticipantStatus.ACTIVE &&
-                  pendingPaymentStatuses.includes(item.paymentStatus),
-              )
+              .filter(isAwaitingPaymentEnrollment)
               .map((item) => ({
                 id: item.id,
                 participantName: item.participantName,
@@ -333,9 +316,7 @@ export default async function DashboardPage({
                 paymentStatus: item.paymentStatus,
               }));
             const totalAthletes = racha.enrollments.filter(
-              (item) =>
-                item.status !== ParticipantStatus.CANCELED &&
-                item.paymentStatus !== PaymentStatus.REFUNDED,
+              (item) => isVisibleEnrollment(item) && !isGoalkeeperEnrollment(item),
             ).length;
 
             return (
@@ -398,6 +379,7 @@ export default async function DashboardPage({
                           paymentStatus: item.paymentStatus,
                         }))}
                         athleteLimit={racha.athleteLimit}
+                        goalkeeperLimit={racha.goalkeeperLimit}
                         whatsappGroupUrl={racha.whatsappGroupUrl}
                       />
                     </div>
@@ -446,6 +428,7 @@ export default async function DashboardPage({
                           paymentStatus: item.paymentStatus,
                         }))}
                         athleteLimit={racha.athleteLimit}
+                        goalkeeperLimit={racha.goalkeeperLimit}
                         slug={racha.slug}
                         whatsappGroupUrl={racha.whatsappGroupUrl}
                       />

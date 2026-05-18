@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isGoalkeeperPosition } from "@/lib/enrollment";
 
 function isEmailValue(value: string) {
   return z.string().email().safeParse(value).success;
@@ -166,11 +167,16 @@ export const enrollmentSchema = z.object({
     .refine((value) => value, "Você deve aceitar as regras."),
   paymentCommitment: z.coerce
     .boolean()
-    .refine(
-      (value) => value,
-      "Confirme que só estará na lista após realizar o pagamento.",
-    ),
+    .default(false),
   accessKey: z.string().optional().or(z.literal("")),
+}).superRefine((data, context) => {
+  if (!isGoalkeeperPosition(data.participantPosition) && !data.paymentCommitment) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["paymentCommitment"],
+      message: "Confirme que só estará na lista após realizar o pagamento.",
+    });
+  }
 });
 
 export const organizerEnrollmentSchema = z.object({

@@ -16,6 +16,7 @@ import {
   positionOptionsFutebol,
   positionOptionsVolei,
 } from "@/lib/constants";
+import { isGoalkeeperPosition } from "@/lib/enrollment";
 
 export function JoinRachaForm({
   privateAccessGranted = false,
@@ -52,6 +53,7 @@ export function JoinRachaForm({
     !isPrivateRacha || privateAccessGranted || keyValidationState.success;
   const organizerWhatsappMessage = `Eu quero participar no racha *${racha.title}*. Por favor me informar a chave para entrar na lista`;
   const organizerWhatsappUrl = `https://wa.me/${racha.phoneWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(organizerWhatsappMessage)}`;
+  const [selectedPosition, setSelectedPosition] = useState("Versátil");
 
   const availablePositions =
     racha.modality === "FUTEBOL"
@@ -64,6 +66,7 @@ export function JoinRachaForm({
     isPrivateRacha && !keyValidationState.success
       ? keyValidationState.message
       : null;
+  const isGoalkeeperSelection = isGoalkeeperPosition(selectedPosition);
 
   function handleAccessKeyChange(value: string) {
     setAccessKey(value);
@@ -84,7 +87,9 @@ export function JoinRachaForm({
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {isPrivateRacha
             ? "Racha privado: confirme a chave secreta para liberar o formulário de inscrição."
-            : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições."}
+            : isGoalkeeperSelection
+              ? "Informe seus dados e finalize a inscrição. Goleiro entra confirmado automaticamente e não paga taxa."
+              : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições."}
         </p>
       </div>
 
@@ -126,10 +131,17 @@ export function JoinRachaForm({
         </form>
       ) : null}
 
-      {isKeyStepConfirmed ? (
+      {isKeyStepConfirmed && !isGoalkeeperSelection ? (
         <div className="rounded-2xl border border-dashed border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
           <p className="font-semibold">Chave PIX do organizador</p>
           <p className="mt-1 break-all">{racha.pixKey}</p>
+        </div>
+      ) : null}
+
+      {isKeyStepConfirmed && isGoalkeeperSelection ? (
+        <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-semibold">Inscrição de goleiro sem taxa</p>
+          <p className="mt-1">Goleiro entra confirmado automaticamente e não precisa enviar PIX.</p>
         </div>
       ) : null}
 
@@ -164,7 +176,11 @@ export function JoinRachaForm({
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-sm font-medium text-slate-700">
               Posição
-              <Select defaultValue="Versátil" name="participantPosition">
+              <Select
+                defaultValue="Versátil"
+                name="participantPosition"
+                onChange={(event) => setSelectedPosition(event.target.value)}
+              >
                 {availablePositions.map((position) => (
                   <option key={position} value={position}>
                     {position}
@@ -193,16 +209,18 @@ export function JoinRachaForm({
             />
           </label>
 
-          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <input
-              className="mt-1 h-4 w-4 rounded border-slate-300"
-              name="paymentCommitment"
-              type="checkbox"
-            />
-            <span>
-              Confirmo que só estarei na lista quando realizar o pagamento.
-            </span>
-          </label>
+          {!isGoalkeeperSelection ? (
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <input
+                className="mt-1 h-4 w-4 rounded border-slate-300"
+                name="paymentCommitment"
+                type="checkbox"
+              />
+              <span>
+                Confirmo que só estarei na lista quando realizar o pagamento.
+              </span>
+            </label>
+          ) : null}
 
           <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <input

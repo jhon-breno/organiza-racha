@@ -7,6 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { ToastContainer } from "@/components/toast-container";
 import { useToast } from "@/hooks/use-toast";
 import { levelLabels } from "@/lib/constants";
+import {
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+  isVisibleEnrollment,
+} from "@/lib/enrollment";
 import { formatDateTimeShort } from "@/lib/utils";
 
 type AllAthleteEnrollment = {
@@ -26,6 +31,7 @@ type AllAthletesListModalProps = {
   locationName: string;
   enrollments: AllAthleteEnrollment[];
   athleteLimit: number;
+  goalkeeperLimit?: number | null;
   slug: string;
   whatsappGroupUrl?: string | null;
 };
@@ -43,7 +49,7 @@ function getUnifiedStatus(enrollment: AllAthleteEnrollment): string {
   if (enrollment.status === "WAITLIST") {
     return "Lista de espera";
   }
-  if (enrollment.status === "ACTIVE" && enrollment.paymentStatus === "PAID") {
+  if (isConfirmedEnrollment(enrollment)) {
     return "Confirmado";
   }
   if (
@@ -84,8 +90,10 @@ function generateWhatsappMessage(
   rachaTitle: string,
   eventDate: Date,
   locationName: string,
-  enrollments: AllAthleteEnrollment[],
+  lineEnrollments: AllAthleteEnrollment[],
+  goalkeeperEnrollments: AllAthleteEnrollment[],
   athleteLimit: number,
+  goalkeeperLimit: number | null | undefined,
   slug: string,
 ): string {
   const dateStr = formatDateTimeShort(eventDate);
@@ -97,14 +105,24 @@ function generateWhatsappMessage(
   message += `Inscrição: ${inscriptionUrl}\n\n`;
   message += `Atletas e status:\n`;
 
-  const activeEnrollments = enrollments.filter(
-    (e) => e.status !== "CANCELED" && e.paymentStatus !== "REFUNDED",
-  );
-
-  activeEnrollments.forEach((enrollment, index) => {
+  lineEnrollments.forEach((enrollment, index) => {
     const status = getUnifiedStatus(enrollment);
     message += `${index + 1} - ${enrollment.participantName} (${status})\n`;
   });
+
+  const goalkeeperSlots = Math.max(goalkeeperLimit ?? 0, goalkeeperEnrollments.length);
+
+  if (goalkeeperSlots > 0) {
+    message += `\nGoleiros:\n`;
+
+    for (let i = 0; i < goalkeeperSlots; i++) {
+      if (i < goalkeeperEnrollments.length) {
+        message += `${i + 1} - ${goalkeeperEnrollments[i]!.participantName}\n`;
+      } else {
+        message += `${i + 1} - \n`;
+      }
+    }
+  }
 
   return message;
 }
@@ -116,6 +134,7 @@ export function AllAthletesListModal({
   locationName,
   enrollments,
   athleteLimit,
+  goalkeeperLimit,
   slug,
   whatsappGroupUrl,
 }: AllAthletesListModalProps) {
@@ -125,20 +144,25 @@ export function AllAthletesListModal({
   );
   const { toasts, addToast, removeToast } = useToast();
 
-  const activeEnrollments = useMemo(
-    () =>
-      enrollments.filter(
-        (e) => e.status !== "CANCELED" && e.paymentStatus !== "REFUNDED",
-      ),
-    [enrollments],
+  const activeEnrollments = useMemo(() => enrollments.filter(isVisibleEnrollment), [enrollments]);
+  const lineEnrollments = useMemo(
+    () => activeEnrollments.filter((item) => !isGoalkeeperEnrollment(item)),
+    [activeEnrollments],
+  );
+  const goalkeeperEnrollments = useMemo(
+    () => activeEnrollments.filter(isGoalkeeperEnrollment),
+    [activeEnrollments],
   );
 
   const subtitle = useMemo(() => {
-    if (activeEnrollments.length === 1) {
+    if (lineEnrollments.length === 1 && goalkeeperEnrollments.length === 0) {
       return "1 atleta inscrito";
     }
-    return `${activeEnrollments.length} atletas inscritos`;
-  }, [activeEnrollments.length]);
+    if (goalkeeperEnrollments.length === 0) {
+      return `${lineEnrollments.length} atletas inscritos`;
+    }
+    return `${lineEnrollments.length} atletas inscritos + ${goalkeeperEnrollments.length} goleiro(s)`;
+  }, [goalkeeperEnrollments.length, lineEnrollments.length]);
 
   const whatsappMessage = useMemo(
     () =>
@@ -146,16 +170,20 @@ export function AllAthletesListModal({
         rachaTitle,
         eventDate,
         locationName,
-        activeEnrollments,
+        lineEnrollments,
+        goalkeeperEnrollments,
         athleteLimit,
+        goalkeeperLimit,
         slug,
       ),
     [
-      rachaTitle,
-      eventDate,
-      locationName,
-      activeEnrollments,
       athleteLimit,
+      eventDate,
+      goalkeeperEnrollments,
+      goalkeeperLimit,
+      lineEnrollments,
+      locationName,
+      rachaTitle,
       slug,
     ],
   );
@@ -282,36 +310,72 @@ export function AllAthletesListModal({
             ) : (
               <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
                 <div className="space-y-2">
-                  {activeEnrollments.length === 0 ? (
+                  {lineEnrollments.length === 0 && goalkeeperEnrollments.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
                       Não há atletas inscritos neste racha.
                     </div>
                   ) : (
-                    activeEnrollments.map((enrollment, index) => {
-                      const status = getUnifiedStatus(enrollment);
-                      const statusColor = getStatusColor(status);
+                    <>
+                      {lineEnrollments.map((enrollment, index) => {
+                        const status = getUnifiedStatus(enrollment);
+                        const statusColor = getStatusColor(status);
 
-                      return (
-                        <div
-                          key={enrollment.id}
-                          className="flex items-start justify-between rounded-2xl border border-slate-200 p-3"
-                        >
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-bold text-slate-950">
-                              {index + 1}. {enrollment.participantName}
-                            </p>
-                            <p className="text-xs text-slate-600">
-                              {enrollment.participantPhone} •{" "}
-                              {enrollment.participantPosition} •{" "}
-                              {levelLabels[enrollment.participantLevel]}
-                            </p>
+                        return (
+                          <div
+                            key={enrollment.id}
+                            className="flex items-start justify-between rounded-2xl border border-slate-200 p-3"
+                          >
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-bold text-slate-950">
+                                {index + 1}. {enrollment.participantName}
+                              </p>
+                              <p className="text-xs text-slate-600">
+                                {enrollment.participantPhone} •{" "}
+                                {enrollment.participantPosition} •{" "}
+                                {levelLabels[enrollment.participantLevel]}
+                              </p>
+                            </div>
+                            <Badge className={`ml-3 ${statusColor}`}>
+                              {status}
+                            </Badge>
                           </div>
-                          <Badge className={`ml-3 ${statusColor}`}>
-                            {status}
-                          </Badge>
+                        );
+                      })}
+
+                      {goalkeeperEnrollments.length > 0 ? (
+                        <div className="pt-2">
+                          <p className="mb-3 text-sm font-semibold text-slate-700">
+                            Goleiros
+                          </p>
+                          <div className="space-y-3">
+                            {goalkeeperEnrollments.map((enrollment, index) => {
+                              const status = getUnifiedStatus(enrollment);
+                              const statusColor = getStatusColor(status);
+
+                              return (
+                                <div
+                                  key={enrollment.id}
+                                  className="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-3"
+                                >
+                                  <div className="flex-1 space-y-1">
+                                    <p className="text-sm font-bold text-slate-950">
+                                      {index + 1}. {enrollment.participantName}
+                                    </p>
+                                    <p className="text-xs text-slate-600">
+                                      {enrollment.participantPhone} •{" "}
+                                      {levelLabels[enrollment.participantLevel]}
+                                    </p>
+                                  </div>
+                                  <Badge className={`ml-3 ${statusColor}`}>
+                                    {status}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      );
-                    })
+                      ) : null}
+                    </>
                   )}
                 </div>
 

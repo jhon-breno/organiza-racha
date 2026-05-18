@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToastContainer } from "@/components/toast-container";
 import { useToast } from "@/hooks/use-toast";
 import { participantStatusLabels, levelLabels } from "@/lib/constants";
+import { isConfirmedEnrollment, isGoalkeeperEnrollment } from "@/lib/enrollment";
 import { formatDateTimeShort } from "@/lib/utils";
 
 type ExportableEnrollment = {
@@ -26,11 +27,12 @@ type ConfirmedListModalProps = {
   locationName: string;
   enrollments: ExportableEnrollment[];
   athleteLimit: number;
+  goalkeeperLimit?: number | null;
   whatsappGroupUrl?: string | null;
 };
 
 function getUnifiedStatus(enrollment: ExportableEnrollment): string {
-  if (enrollment.status === "ACTIVE" && enrollment.paymentStatus === "PAID") {
+  if (isConfirmedEnrollment(enrollment)) {
     return "Confirmado";
   }
   return participantStatusLabels[enrollment.status] ?? enrollment.status;
@@ -40,8 +42,10 @@ function generateWhatsappMessage(
   rachaTitle: string,
   eventDate: Date,
   locationName: string,
-  enrollments: ExportableEnrollment[],
+  lineEnrollments: ExportableEnrollment[],
+  goalkeeperEnrollments: ExportableEnrollment[],
   athleteLimit: number,
+  goalkeeperLimit?: number | null,
 ): string {
   const dateStr = formatDateTimeShort(eventDate);
 
@@ -51,11 +55,25 @@ function generateWhatsappMessage(
   message += `Lista de atletas:\n`;
 
   for (let i = 0; i < athleteLimit; i++) {
-    if (i < enrollments.length) {
-      const status = getUnifiedStatus(enrollments[i]!);
-      message += `${i + 1} - ${enrollments[i]!.participantName} (${status})\n`;
+    if (i < lineEnrollments.length) {
+      const status = getUnifiedStatus(lineEnrollments[i]!);
+      message += `${i + 1} - ${lineEnrollments[i]!.participantName} (${status})\n`;
     } else {
       message += `${i + 1} - \n`;
+    }
+  }
+
+  const goalkeeperSlots = Math.max(goalkeeperLimit ?? 0, goalkeeperEnrollments.length);
+
+  if (goalkeeperSlots > 0) {
+    message += `\nGoleiros:\n`;
+
+    for (let i = 0; i < goalkeeperSlots; i++) {
+      if (i < goalkeeperEnrollments.length) {
+        message += `${i + 1} - ${goalkeeperEnrollments[i]!.participantName}\n`;
+      } else {
+        message += `${i + 1} - \n`;
+      }
     }
   }
 
@@ -69,6 +87,7 @@ export function ConfirmedListModal({
   locationName,
   enrollments,
   athleteLimit,
+  goalkeeperLimit,
   whatsappGroupUrl,
 }: ConfirmedListModalProps) {
   const [open, setOpen] = useState(false);
@@ -76,13 +95,24 @@ export function ConfirmedListModal({
     null,
   );
   const { toasts, addToast, removeToast } = useToast();
+  const lineEnrollments = useMemo(
+    () => enrollments.filter((item) => !isGoalkeeperEnrollment(item)),
+    [enrollments],
+  );
+  const goalkeeperEnrollments = useMemo(
+    () => enrollments.filter(isGoalkeeperEnrollment),
+    [enrollments],
+  );
 
   const subtitle = useMemo(() => {
-    if (enrollments.length === 1) {
+    if (lineEnrollments.length === 1 && goalkeeperEnrollments.length === 0) {
       return `1 de ${athleteLimit} confirmado`;
     }
-    return `${enrollments.length} de ${athleteLimit} confirmados`;
-  }, [enrollments.length, athleteLimit]);
+    if (goalkeeperEnrollments.length === 0) {
+      return `${lineEnrollments.length} de ${athleteLimit} confirmados`;
+    }
+    return `${lineEnrollments.length} de ${athleteLimit} confirmados + ${goalkeeperEnrollments.length} goleiro(s)`;
+  }, [athleteLimit, goalkeeperEnrollments.length, lineEnrollments.length]);
 
   const whatsappMessage = useMemo(
     () =>
@@ -90,10 +120,20 @@ export function ConfirmedListModal({
         rachaTitle,
         eventDate,
         locationName,
-        enrollments,
+        lineEnrollments,
+        goalkeeperEnrollments,
         athleteLimit,
+        goalkeeperLimit,
       ),
-    [rachaTitle, eventDate, locationName, enrollments, athleteLimit],
+    [
+      athleteLimit,
+      eventDate,
+      goalkeeperEnrollments,
+      goalkeeperLimit,
+      lineEnrollments,
+      locationName,
+      rachaTitle,
+    ],
   );
 
   const handleCopyWhatsapp = async () => {
@@ -218,31 +258,62 @@ export function ConfirmedListModal({
             ) : (
               <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
                 <div className="space-y-3">
-                  {enrollments.length === 0 ? (
+                  {lineEnrollments.length === 0 && goalkeeperEnrollments.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
                       Não há participantes confirmados neste racha.
                     </div>
                   ) : (
-                    enrollments.map((enrollment, index) => (
-                      <div
-                        key={enrollment.id}
-                        className="flex items-start justify-between rounded-2xl border border-slate-200 p-3"
-                      >
-                        <div className="flex-1 space-y-1">
-                          <p className="text-sm font-bold text-slate-950">
-                            {index + 1}. {enrollment.participantName}
-                          </p>
-                          <p className="text-xs text-slate-600">
-                            {enrollment.participantPhone} •{" "}
-                            {enrollment.participantPosition} •{" "}
-                            {levelLabels[enrollment.participantLevel]}
-                          </p>
+                    <>
+                      {lineEnrollments.map((enrollment, index) => (
+                        <div
+                          key={enrollment.id}
+                          className="flex items-start justify-between rounded-2xl border border-slate-200 p-3"
+                        >
+                          <div className="flex-1 space-y-1">
+                            <p className="text-sm font-bold text-slate-950">
+                              {index + 1}. {enrollment.participantName}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              {enrollment.participantPhone} •{" "}
+                              {enrollment.participantPosition} •{" "}
+                              {levelLabels[enrollment.participantLevel]}
+                            </p>
+                          </div>
+                          <Badge className="ml-3 bg-emerald-100 text-emerald-700">
+                            Confirmado
+                          </Badge>
                         </div>
-                        <Badge className="ml-3 bg-emerald-100 text-emerald-700">
-                          Confirmado
-                        </Badge>
-                      </div>
-                    ))
+                      ))}
+
+                      {goalkeeperEnrollments.length > 0 ? (
+                        <div className="pt-2">
+                          <p className="mb-3 text-sm font-semibold text-slate-700">
+                            Goleiros
+                          </p>
+                          <div className="space-y-3">
+                            {goalkeeperEnrollments.map((enrollment, index) => (
+                              <div
+                                key={enrollment.id}
+                                className="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-3"
+                              >
+                                <div className="flex-1 space-y-1">
+                                  <p className="text-sm font-bold text-slate-950">
+                                    {index + 1}. {enrollment.participantName}
+                                  </p>
+                                  <p className="text-xs text-slate-600">
+                                    {enrollment.participantPhone} •{" "}
+                                    {levelLabels[enrollment.participantLevel]}
+                                  </p>
+                                </div>
+                                <Badge className="ml-3 bg-emerald-100 text-emerald-700">
+                                  Confirmado
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
 
