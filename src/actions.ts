@@ -1248,7 +1248,7 @@ export async function deleteRachaAction(formData: FormData) {
 export async function joinRachaAction(formData: FormData) {
   const slug = getStringValue(formData, "slug");
   const callbackUrl = `/rachas/${slug}`;
-  const user = await requireUser(callbackUrl);
+  const session = await auth();
   const rachaId = getStringValue(formData, "rachaId");
 
   const parsed = enrollmentSchema.safeParse({
@@ -1343,6 +1343,7 @@ export async function joinRachaAction(formData: FormData) {
   const isGoalkeeperEnrollment =
     racha.modality === "FUTEBOL" &&
     isGoalkeeperPosition(parsed.data.participantPosition);
+  const normalizedPhone = normalizePhoneValue(parsed.data.participantPhone);
 
   // Validação de vagas por posição específica
   if (
@@ -1392,11 +1393,18 @@ export async function joinRachaAction(formData: FormData) {
     }
   }
 
+  const participantUser = session?.user?.id
+    ? { id: session.user.id }
+    : await getOrCreateParticipantUser({
+        name: parsed.data.participantName,
+        phone: normalizedPhone,
+      });
+
   const existing = await prisma.enrollment.findUnique({
     where: {
       rachaId_userId: {
         rachaId,
-        userId: user.id,
+        userId: participantUser.id,
       },
     },
   });
@@ -1461,7 +1469,7 @@ export async function joinRachaAction(formData: FormData) {
       where: { id: existing.id },
       data: {
         participantName: parsed.data.participantName,
-        participantPhone: parsed.data.participantPhone,
+        participantPhone: normalizedPhone,
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
         acceptedRules: true,
@@ -1477,9 +1485,9 @@ export async function joinRachaAction(formData: FormData) {
     await prisma.enrollment.create({
       data: {
         rachaId,
-        userId: user.id,
+        userId: participantUser.id,
         participantName: parsed.data.participantName,
-        participantPhone: parsed.data.participantPhone,
+        participantPhone: normalizedPhone,
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
         acceptedRules: true,
@@ -1492,15 +1500,19 @@ export async function joinRachaAction(formData: FormData) {
   }
 
   revalidatePath(callbackUrl);
-  revalidatePath("/minhas-inscricoes");
+  if (session?.user?.id) {
+    revalidatePath("/minhas-inscricoes");
+  }
   revalidatePath("/dashboard");
 
   redirect(
     buildMessageUrl(
-      "/minhas-inscricoes",
+      session?.user?.id ? "/minhas-inscricoes" : callbackUrl,
       "success",
       nextStatus === ParticipantStatus.WAITLIST
-        ? "Inscrição registrada na lista de espera. Acompanhe em Minhas inscrições."
+        ? session?.user?.id
+          ? "Inscrição registrada na lista de espera. Acompanhe em Minhas inscrições."
+          : "Inscrição registrada na lista de espera com sucesso."
         : isGoalkeeperEnrollment
           ? "Inscrição de goleiro confirmada com sucesso. Você já entrou na lista do racha."
           : "Inscrição registrada com sucesso. Realize o pagamento para seguir no racha.",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { joinRachaAction, validatePrivateAccessKeyAction } from "@/actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -22,11 +22,13 @@ export function JoinRachaForm({
   privateAccessGranted = false,
   defaultParticipantName,
   defaultParticipantPhone,
+  isAuthenticated = false,
   racha,
 }: {
   privateAccessGranted?: boolean;
   defaultParticipantName?: string;
   defaultParticipantPhone?: string;
+  isAuthenticated?: boolean;
   racha: {
     id: string;
     slug: string;
@@ -42,7 +44,10 @@ export function JoinRachaForm({
   };
 }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [accessKey, setAccessKey] = useState("");
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [allowGuestSubmit, setAllowGuestSubmit] = useState(false);
   const [keyValidationState, validateAccessKey, isValidatingKey] =
     useActionState(validatePrivateAccessKeyAction, {
       success: false,
@@ -70,6 +75,29 @@ export function JoinRachaForm({
 
   function handleAccessKeyChange(value: string) {
     setAccessKey(value);
+  }
+
+  function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (isAuthenticated || allowGuestSubmit) {
+      return;
+    }
+
+    event.preventDefault();
+    setShowLoginPrompt(true);
+  }
+
+  function handleGuestSubmit() {
+    setAllowGuestSubmit(true);
+    setShowLoginPrompt(false);
+
+    requestAnimationFrame(() => {
+      formRef.current?.requestSubmit();
+      setAllowGuestSubmit(false);
+    });
+  }
+
+  function handleSignInRedirect() {
+    router.push(`/auth/signin?callbackUrl=${encodeURIComponent(`/rachas/${racha.slug}`)}`);
   }
 
   useEffect(() => {
@@ -146,7 +174,12 @@ export function JoinRachaForm({
       ) : null}
 
       {isKeyStepConfirmed ? (
-        <form action={joinRachaAction} className="space-y-4">
+        <form
+          action={joinRachaAction}
+          className="space-y-4"
+          onSubmit={handleJoinSubmit}
+          ref={formRef}
+        >
           <input name="rachaId" type="hidden" value={racha.id} />
           <input name="slug" type="hidden" value={racha.slug} />
           {isPrivateRacha ? (
@@ -241,6 +274,40 @@ export function JoinRachaForm({
             Solicitar participação
           </SubmitButton>
         </form>
+      ) : null}
+
+      {showLoginPrompt ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
+              Confirmar inscricao
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-slate-950">
+              Quer realizar login?
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Voce pode entrar na conta para acompanhar a inscricao em Minhas inscricoes ou continuar agora sem login.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Button onClick={handleSignInRedirect} type="button">
+                Sim
+              </Button>
+              <Button onClick={handleGuestSubmit} type="button" variant="outline">
+                Nao. Inscrever agora
+              </Button>
+            </div>
+
+            <Button
+              className="mt-3 w-full"
+              onClick={() => setShowLoginPrompt(false)}
+              type="button"
+              variant="ghost"
+            >
+              Fechar
+            </Button>
+          </div>
+        </div>
       ) : null}
     </Card>
   );

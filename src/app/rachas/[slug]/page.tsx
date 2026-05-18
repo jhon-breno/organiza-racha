@@ -358,6 +358,7 @@ export default async function RachaDetailsPage({
                 currentUserProfile?.name || session?.user?.name || ""
               }
               defaultParticipantPhone={currentUserProfile?.phone || ""}
+              isAuthenticated={Boolean(session?.user?.id)}
               privateAccessGranted={hasPrivateAccess}
               racha={racha}
             />
