@@ -1473,11 +1473,11 @@ export async function joinRachaAction(formData: FormData) {
     },
   });
 
-  const isBlockForThisRacha =
-    Boolean(activeBlock?.active) &&
-    (activeBlock.targetRachaId
+  const isBlockForThisRacha = activeBlock?.active
+    ? activeBlock.targetRachaId
       ? activeBlock.targetRachaId === racha.id
-      : racha.eventDate > activeBlock.anchorEventDate);
+      : racha.eventDate > activeBlock.anchorEventDate
+    : false;
 
   if (activeBlock?.active && isBlockForThisRacha) {
     await prisma.organizerParticipantBlock.update({
