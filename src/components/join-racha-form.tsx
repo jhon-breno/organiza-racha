@@ -35,7 +35,6 @@ export function JoinRachaForm({
     title: string;
     modality: string;
     visibility: "OPEN" | "PRIVATE";
-    pixKey: string;
     phoneWhatsapp: string;
     rules: string;
     goalkeeperLimit?: number | null;
@@ -117,7 +116,7 @@ export function JoinRachaForm({
             ? "Racha privado: confirme a chave secreta para liberar o formulário de inscrição."
             : isGoalkeeperSelection
               ? "Informe seus dados e finalize a inscrição. Goleiro entra confirmado automaticamente e não paga taxa."
-              : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições."}
+              : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições com QR Code PIX."}
         </p>
       </div>
 
@@ -157,13 +156,6 @@ export function JoinRachaForm({
             </Button>
           </div>
         </form>
-      ) : null}
-
-      {isKeyStepConfirmed && !isGoalkeeperSelection ? (
-        <div className="rounded-2xl border border-dashed border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
-          <p className="font-semibold">Chave PIX do organizador</p>
-          <p className="mt-1 break-all">{racha.pixKey}</p>
-        </div>
       ) : null}
 
       {isKeyStepConfirmed && isGoalkeeperSelection ? (

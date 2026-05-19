@@ -145,8 +145,12 @@ export default async function MyEnrollmentsPage({
                   paymentStatus={enrollment.paymentStatus}
                   participantPosition={enrollment.participantPosition}
                   paymentDeadline={paymentDeadlineLabel}
+                  priceInCents={enrollment.racha.priceInCents}
                   pixKey={enrollment.racha.pixKey}
+                  rachaCity={enrollment.racha.city}
                   rachaSlug={enrollment.racha.slug}
+                  rachaTitle={enrollment.racha.title}
+                  organizerDisplayName={enrollment.racha.organizerDisplayName}
                 />
               </Card>
             );

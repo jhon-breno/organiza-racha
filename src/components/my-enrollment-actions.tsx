@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
+import { Check, Copy, X } from "lucide-react";
 import {
   cancelEnrollmentAction,
   cancelPendingEnrollmentAction,
@@ -9,30 +10,44 @@ import {
 import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { buildPixPaymentPayload } from "@/lib/pix";
+import { formatCurrencyFromCents } from "@/lib/utils";
 
 type MyEnrollmentActionsProps = {
   enrollmentId: string;
   rachaSlug: string;
+  rachaTitle: string;
+  rachaCity: string;
+  organizerDisplayName: string;
   enrollmentStatus: string;
   paymentStatus: string;
   participantPosition: string;
   pixKey: string;
+  priceInCents: number;
   paymentDeadline?: string | null;
 };
 
 export function MyEnrollmentActions({
   enrollmentId,
   rachaSlug,
+  rachaTitle,
+  rachaCity,
+  organizerDisplayName,
   enrollmentStatus,
   paymentStatus,
   participantPosition,
   pixKey,
+  priceInCents,
   paymentDeadline,
 }: MyEnrollmentActionsProps) {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCancelPendingModalOpen, setIsCancelPendingModalOpen] =
     useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [paymentQrCodeUrl, setPaymentQrCodeUrl] = useState("");
+  const [paymentCopyFeedback, setPaymentCopyFeedback] = useState<
+    "key" | "payload" | null
+  >(null);
   const [cancelPendingConfirmError, setCancelPendingConfirmError] = useState<
     string | null
   >(null);
@@ -47,6 +62,17 @@ export function MyEnrollmentActions({
     enrollmentStatus !== "CANCELED" && (isGoalkeeper || paymentStatus === "PENDING");
   const canRequestRefund =
     !isGoalkeeper && paymentStatus === "PAID" && enrollmentStatus !== "CANCELED";
+  const pixPayload = useMemo(
+    () =>
+      buildPixPaymentPayload({
+        pixKey,
+        amountInCents: priceInCents,
+        merchantName: organizerDisplayName,
+        merchantCity: rachaCity,
+        description: rachaTitle,
+      }),
+    [organizerDisplayName, pixKey, priceInCents, rachaCity, rachaTitle],
+  );
 
   const modalTitle = useMemo(() => {
     if (isPaymentModalOpen) {
@@ -63,6 +89,46 @@ export function MyEnrollmentActions({
 
     return "";
   }, [isCancelPendingModalOpen, isPaymentModalOpen, isRefundModalOpen]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!isPaymentModalOpen || !pixPayload) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    QRCode.toDataURL(pixPayload, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 280,
+    })
+      .then((dataUrl) => {
+        if (isMounted) {
+          setPaymentQrCodeUrl(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPaymentQrCodeUrl("");
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isPaymentModalOpen, pixPayload]);
+
+  async function handleCopyPaymentValue(value: string, type: "key" | "payload") {
+    try {
+      await navigator.clipboard.writeText(value);
+      setPaymentCopyFeedback(type);
+      window.setTimeout(() => setPaymentCopyFeedback(null), 1800);
+    } catch {
+      setPaymentCopyFeedback(null);
+    }
+  }
 
   return (
     <>
@@ -118,6 +184,7 @@ export function MyEnrollmentActions({
                   setIsPaymentModalOpen(false);
                   setIsCancelPendingModalOpen(false);
                   setIsRefundModalOpen(false);
+                  setPaymentCopyFeedback(null);
                   setCancelPendingConfirmError(null);
                   setRefundConfirmError(null);
                 }}
@@ -130,13 +197,80 @@ export function MyEnrollmentActions({
             {isPaymentModalOpen ? (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">
-                  Faça o PIX com a chave do organizador abaixo. Após a
-                  confirmação do organizador, o status será alterado para pago.
+                  Escaneie o QR Code ou copie os dados do PIX. Após a confirmação
+                  do organizador, o status será alterado para pago.
                 </p>
-                <div className="rounded-xl border border-dashed border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
-                  <p className="font-semibold">Chave PIX do organizador</p>
-                  <p className="mt-1 break-all">{pixKey}</p>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Valor</p>
+                  <p className="mt-1 text-2xl font-black text-slate-950">
+                    {formatCurrencyFromCents(priceInCents)}
+                  </p>
                 </div>
+
+                <div className="flex flex-col items-center gap-4 rounded-2xl border border-teal-200 bg-teal-50 p-4">
+                  {paymentQrCodeUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={`QR Code PIX para ${rachaTitle}`}
+                      className="h-64 w-64 rounded-2xl border border-white bg-white p-3"
+                      src={paymentQrCodeUrl}
+                    />
+                  ) : (
+                    <div className="flex h-64 w-64 items-center justify-center rounded-2xl border border-dashed border-teal-300 bg-white text-sm text-slate-500">
+                      Gerando QR Code PIX...
+                    </div>
+                  )}
+
+                  <p className="text-center text-sm text-teal-900">
+                    Use o app do banco para escanear e pagar exatamente o valor do racha.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-950">Chave PIX</p>
+                  <p className="mt-2 break-all">{pixKey}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => handleCopyPaymentValue(pixKey, "key")}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {paymentCopyFeedback === "key" ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Chave copiada
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Copiar chave
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => handleCopyPaymentValue(pixPayload, "payload")}
+                      disabled={!pixPayload}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {paymentCopyFeedback === "payload" ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          PIX copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Copiar PIX copia e cola
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
                 {paymentDeadline ? (
                   <p className="text-sm text-slate-600">
                     Prazo para pagamento: <strong>{paymentDeadline}</strong>
