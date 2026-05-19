@@ -246,6 +246,7 @@ export default async function EditRachaPage({
                 locationName={racha.locationName}
                 enrollments={racha.enrollments.map((item) => ({
                   id: item.id,
+                  createdAt: item.createdAt,
                   participantName: item.participantName,
                   participantPhone: item.participantPhone,
                   participantPosition: item.participantPosition,
