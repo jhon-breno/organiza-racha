@@ -29,9 +29,20 @@ export function RachaCard({ racha }: RachaCardProps) {
   const occupiedAthleteSlots = racha.enrollments.filter(
     countsTowardAthleteLimit,
   ).length;
+  const remainingAthleteSlots = Math.max(
+    racha.athleteLimit - occupiedAthleteSlots,
+    0,
+  );
+  const isSoldOut = remainingAthleteSlots === 0;
+  const isAlmostSoldOut = remainingAthleteSlots > 0 && remainingAthleteSlots <= 3;
+  const cardAlertClassName = isSoldOut
+    ? "racha-card-sold-out border-rose-500"
+    : isAlmostSoldOut
+      ? "racha-card-almost-full border-amber-400"
+      : "";
 
   return (
-    <Card className="overflow-hidden p-0">
+    <Card className={`overflow-hidden p-0 ${cardAlertClassName}`}>
       <div
         className="h-40 bg-linear-to-br from-teal-700 via-cyan-700 to-emerald-600"
         style={{
@@ -46,6 +57,13 @@ export function RachaCard({ racha }: RachaCardProps) {
           <Badge className="bg-slate-100 text-slate-700">
             {racha.visibility === "PRIVATE" ? "Privado" : "Aberto"}
           </Badge>
+          {isSoldOut ? (
+            <Badge className="bg-rose-100 text-rose-700">Lotado</Badge>
+          ) : isAlmostSoldOut ? (
+            <Badge className="bg-amber-100 text-amber-700">
+              Ultimas {remainingAthleteSlots} vaga(s)
+            </Badge>
+          ) : null}
         </div>
 
         <div>
