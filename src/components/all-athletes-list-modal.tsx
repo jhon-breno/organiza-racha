@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, MessageCircle, X, Copy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Copy, Download, MessageCircle, X } from "lucide-react";
 import { ToastContainer } from "@/components/toast-container";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { levelLabels } from "@/lib/constants";
 import {
-  isConfirmedEnrollment,
+  compareEnrollmentsForExport,
+  getEnrollmentStatusEmoji,
+  getEnrollmentStatusLabel,
   isGoalkeeperEnrollment,
   isVisibleEnrollment,
 } from "@/lib/enrollment";
@@ -16,6 +18,7 @@ import { formatDateTimeShort } from "@/lib/utils";
 
 type AllAthleteEnrollment = {
   id: string;
+  createdAt: Date | string;
   participantName: string;
   participantPhone: string;
   participantPosition: string;
@@ -36,37 +39,6 @@ type AllAthletesListModalProps = {
   whatsappGroupUrl?: string | null;
 };
 
-function getUnifiedStatus(enrollment: AllAthleteEnrollment): string {
-  if (enrollment.status === "CANCELED") {
-    return "Cancelado";
-  }
-  if (enrollment.paymentStatus === "REFUNDED") {
-    return "Cancelado";
-  }
-  if (enrollment.paymentStatus === "REFUND_REQUESTED") {
-    return "Aguardando reembolso";
-  }
-  if (enrollment.status === "WAITLIST") {
-    return "Lista de espera";
-  }
-  if (isConfirmedEnrollment(enrollment)) {
-    return "Confirmado";
-  }
-  if (
-    enrollment.status === "ACTIVE" &&
-    enrollment.paymentStatus === "PENDING"
-  ) {
-    return "Aguardando pagamento";
-  }
-  if (
-    enrollment.status === "ACTIVE" &&
-    enrollment.paymentStatus === "PROOF_SENT"
-  ) {
-    return "Pagamento em análise";
-  }
-  return "Pendente";
-}
-
 function getStatusColor(
   status: string,
 ):
@@ -79,10 +51,12 @@ function getStatusColor(
     status === "Aguardando pagamento" ||
     status === "Pagamento em análise" ||
     status === "Aguardando reembolso"
-  )
+  ) {
     return "bg-amber-100 text-amber-700";
-  if (status === "Cancelado" || status === "Pendente")
+  }
+  if (status === "Cancelado" || status === "Pendente") {
     return "bg-rose-100 text-rose-700";
+  }
   return "bg-slate-100 text-slate-700";
 }
 
@@ -105,22 +79,34 @@ function generateWhatsappMessage(
   message += `Inscrição: ${inscriptionUrl}\n\n`;
   message += `Atletas e status:\n`;
 
-  lineEnrollments.forEach((enrollment, index) => {
-    const status = getUnifiedStatus(enrollment);
-    message += `${index + 1} - ${enrollment.participantName} (${status})\n`;
-  });
+  for (let index = 0; index < athleteLimit; index += 1) {
+    const enrollment = lineEnrollments[index];
 
-  const goalkeeperSlots = Math.max(goalkeeperLimit ?? 0, goalkeeperEnrollments.length);
+    if (!enrollment) {
+      message += `${index + 1} - \n`;
+      continue;
+    }
+
+    message += `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+  }
+
+  const goalkeeperSlots = Math.max(
+    goalkeeperLimit ?? 0,
+    goalkeeperEnrollments.length,
+  );
 
   if (goalkeeperSlots > 0) {
     message += `\nGoleiros:\n`;
 
-    for (let i = 0; i < goalkeeperSlots; i++) {
-      if (i < goalkeeperEnrollments.length) {
-        message += `${i + 1} - ${goalkeeperEnrollments[i]!.participantName}\n`;
-      } else {
-        message += `${i + 1} - \n`;
+    for (let index = 0; index < goalkeeperSlots; index += 1) {
+      const enrollment = goalkeeperEnrollments[index];
+
+      if (!enrollment) {
+        message += `${index + 1} - \n`;
+        continue;
       }
+
+      message += `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}\n`;
     }
   }
 
@@ -144,13 +130,22 @@ export function AllAthletesListModal({
   );
   const { toasts, addToast, removeToast } = useToast();
 
-  const activeEnrollments = useMemo(() => enrollments.filter(isVisibleEnrollment), [enrollments]);
+  const activeEnrollments = useMemo(
+    () => enrollments.filter(isVisibleEnrollment),
+    [enrollments],
+  );
   const lineEnrollments = useMemo(
-    () => activeEnrollments.filter((item) => !isGoalkeeperEnrollment(item)),
+    () =>
+      activeEnrollments
+        .filter((item) => !isGoalkeeperEnrollment(item))
+        .sort(compareEnrollmentsForExport),
     [activeEnrollments],
   );
   const goalkeeperEnrollments = useMemo(
-    () => activeEnrollments.filter(isGoalkeeperEnrollment),
+    () =>
+      activeEnrollments
+        .filter(isGoalkeeperEnrollment)
+        .sort(compareEnrollmentsForExport),
     [activeEnrollments],
   );
 
@@ -270,7 +265,7 @@ export function AllAthletesListModal({
 
             {exportFormat === "whatsapp" ? (
               <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
-                <div className="max-h-[38vh] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-900 whitespace-pre-wrap sm:max-h-[50vh]">
+                <div className="max-h-[38vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-900 sm:max-h-[50vh]">
                   {whatsappMessage}
                 </div>
 
@@ -317,7 +312,7 @@ export function AllAthletesListModal({
                   ) : (
                     <>
                       {lineEnrollments.map((enrollment, index) => {
-                        const status = getUnifiedStatus(enrollment);
+                        const status = getEnrollmentStatusLabel(enrollment);
                         const statusColor = getStatusColor(status);
 
                         return (
@@ -349,7 +344,7 @@ export function AllAthletesListModal({
                           </p>
                           <div className="space-y-3">
                             {goalkeeperEnrollments.map((enrollment, index) => {
-                              const status = getUnifiedStatus(enrollment);
+                              const status = getEnrollmentStatusLabel(enrollment);
                               const statusColor = getStatusColor(status);
 
                               return (
@@ -383,7 +378,7 @@ export function AllAthletesListModal({
                   <p className="mb-3 text-sm font-semibold text-slate-700">
                     Exportar como:
                   </p>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => setExportFormat("whatsapp")}
                       variant="default"

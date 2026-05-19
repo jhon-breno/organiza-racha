@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { Racha, Enrollment } from "@prisma/client";
 import { levelLabels } from "@/lib/constants";
 import {
+  compareEnrollmentsForExport,
+  getEnrollmentStatusEmoji,
+  getEnrollmentStatusLabel,
   isConfirmedEnrollment,
   isGoalkeeperEnrollment,
   isVisibleEnrollment,
@@ -78,47 +81,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function getStatusLabel(enrollment: {
-  participantPosition?: string | null;
-  status: string;
-  paymentStatus: string;
-}): string {
-  if (enrollment.status === "CANCELED") {
-    return "Cancelado";
-  }
-  if (enrollment.paymentStatus === "REFUNDED") {
-    return "Cancelado";
-  }
-  if (enrollment.paymentStatus === "REFUND_REQUESTED") {
-    return "Aguardando reembolso";
-  }
-  if (enrollment.status === "WAITLIST") {
-    return "Lista de espera";
-  }
-  if (isConfirmedEnrollment(enrollment)) {
-    return "Confirmado";
-  }
-  if (
-    enrollment.status === "ACTIVE" &&
-    enrollment.paymentStatus === "PENDING"
-  ) {
-    return "Aguardando pagamento";
-  }
-  if (
-    enrollment.status === "ACTIVE" &&
-    enrollment.paymentStatus === "PROOF_SENT"
-  ) {
-    return "Pagamento em análise";
-  }
-  return "Pendente";
-}
-
 function getLineEnrollments(enrollments: Enrollment[]) {
-  return enrollments.filter((item) => !isGoalkeeperEnrollment(item));
+  return enrollments
+    .filter((item) => !isGoalkeeperEnrollment(item))
+    .sort(compareEnrollmentsForExport);
 }
 
 function getGoalkeeperEnrollments(enrollments: Enrollment[]) {
-  return enrollments.filter(isGoalkeeperEnrollment);
+  return enrollments
+    .filter(isGoalkeeperEnrollment)
+    .sort(compareEnrollmentsForExport);
 }
 
 function generateExcel(
@@ -157,7 +129,7 @@ function generateExcel(
               enrollment.participantLevel as keyof typeof levelLabels
             ] || enrollment.participantLevel
           : "",
-        enrollment ? getStatusLabel(enrollment) : "",
+        enrollment ? getEnrollmentStatusLabel(enrollment) : "",
       ];
     }),
     ...Array.from({ length: goalkeeperSlots }, (_, index) => {
@@ -174,7 +146,7 @@ function generateExcel(
               enrollment.participantLevel as keyof typeof levelLabels
             ] || enrollment.participantLevel
           : "",
-        enrollment ? getStatusLabel(enrollment) : "",
+        enrollment ? getEnrollmentStatusLabel(enrollment) : "",
       ];
     }),
   ];
@@ -278,7 +250,7 @@ async function generatePDF(
     }
 
     drawLine(
-      `${index + 1} - ${enrollment.participantName} (${getStatusLabel(enrollment)})`,
+      `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`,
     );
   }
 
@@ -291,7 +263,7 @@ async function generatePDF(
       const enrollment = goalkeeperEnrollments[index];
       drawLine(
         enrollment
-          ? `${index + 1} - ${enrollment.participantName}`
+          ? `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`
           : `${index + 1} - `,
       );
     }

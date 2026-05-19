@@ -62,6 +62,9 @@ export default async function DashboardPage({
   const supportsPixHolderName = Boolean(
     userModel?.fields.some((field) => field.name === "pixHolderName"),
   );
+  const supportsRachaAdminModel = Boolean(
+    Prisma.dmmf.datamodel.models.some((model) => model.name === "RachaAdmin"),
+  );
 
   const organizerSelect: Record<string, boolean> = {
     email: true,
@@ -115,29 +118,28 @@ export default async function DashboardPage({
   const organizerEmail =
     typeof organizerProfile.email === "string" ? organizerProfile.email : "";
 
-  const rachas = await prisma.racha.findMany({
-    where: {
-      OR: [
-        { organizerId: session.user.id },
-        {
-          rachaAdmins: {
-            some: {
-              userId: session.user.id,
-            },
-          },
-        },
-      ],
-    },
-    include: {
-      enrollments: true,
-      rachaAdmins: {
+  const adminRachaLinks = supportsRachaAdminModel
+    ? await prisma.rachaAdmin.findMany({
         where: {
           userId: session.user.id,
         },
         select: {
-          id: true,
+          rachaId: true,
         },
-      },
+      })
+    : [];
+  const adminRachaIds = adminRachaLinks.map((item) => item.rachaId);
+  const adminRachaIdSet = new Set(adminRachaIds);
+
+  const rachas = await prisma.racha.findMany({
+    where: {
+      OR: [
+        { organizerId: session.user.id },
+        ...(adminRachaIds.length > 0 ? [{ id: { in: adminRachaIds } }] : []),
+      ],
+    },
+    include: {
+      enrollments: true,
     },
     orderBy: [{ eventDate: "asc" }],
   });
@@ -329,7 +331,7 @@ export default async function DashboardPage({
           {rachas.map((racha) => {
             const isInvitedAdmin =
               racha.organizerId !== session.user.id &&
-              racha.rachaAdmins.length > 0;
+              adminRachaIdSet.has(racha.id);
             const confirmedEnrollments = racha.enrollments.filter(
               isConfirmedEnrollment,
             );
@@ -472,6 +474,7 @@ export default async function DashboardPage({
                         locationName={racha.locationName}
                         enrollments={racha.enrollments.map((item) => ({
                           id: item.id,
+                          createdAt: item.createdAt,
                           participantName: item.participantName,
                           participantPhone: item.participantPhone,
                           participantPosition: item.participantPosition,

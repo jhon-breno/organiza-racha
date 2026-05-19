@@ -41,7 +41,12 @@ export default async function Home({
       organizer: true,
       enrollments: {
         where: { status: { in: ["ACTIVE", "WAITLIST"] } },
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          status: true,
+          paymentStatus: true,
+          participantPosition: true,
+        },
       },
     },
     orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }],

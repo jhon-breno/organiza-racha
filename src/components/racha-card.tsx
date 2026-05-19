@@ -3,6 +3,7 @@ import { Racha, User, Enrollment } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { countsTowardAthleteLimit } from "@/lib/enrollment";
 import { modalityLabels } from "@/lib/constants";
 import {
   formatCurrencyFromCents,
@@ -13,7 +14,10 @@ import {
 type RachaCardProps = {
   racha: Racha & {
     organizer: User;
-    enrollments: Pick<Enrollment, "id" | "status">[];
+    enrollments: Pick<
+      Enrollment,
+      "id" | "status" | "paymentStatus" | "participantPosition"
+    >[];
   };
 };
 
@@ -22,6 +26,9 @@ export function RachaCard({ racha }: RachaCardProps) {
     racha.modality,
     racha.coverImageUrl,
   );
+  const occupiedAthleteSlots = racha.enrollments.filter(
+    countsTowardAthleteLimit,
+  ).length;
 
   return (
     <Card className="overflow-hidden p-0">
@@ -61,7 +68,7 @@ export function RachaCard({ racha }: RachaCardProps) {
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-teal-600" />
             <span>
-              {racha.enrollments.length}/{racha.athleteLimit} atletas
+              {occupiedAthleteSlots}/{racha.athleteLimit} atletas
             </span>
           </div>
           <div className="flex items-center gap-2">
