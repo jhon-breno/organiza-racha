@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   addOrganizerEnrollmentAction,
   bulkAddOrganizerEnrollmentsAction,
   confirmEnrollmentPaymentAction,
   markEnrollmentRefundedAction,
+  removeOrganizerEnrollmentAction,
+  toggleOrganizerNextRachaBlockAction,
+  updateOrganizerEnrollmentLevelAction,
 } from "@/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +30,14 @@ import {
   isGoalkeeperEnrollment,
 } from "@/lib/enrollment";
 import { formatDateTimeShort } from "@/lib/utils";
+
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
 
 function getUnifiedEnrollmentStatus(enrollment: {
   participantPosition?: string;
@@ -85,16 +96,33 @@ export function EnrollmentManagement({
     participantLevel: string;
     status: string;
     paymentStatus: string;
+    blockedForNextRacha?: boolean;
     createdAt: Date;
   }[];
 }) {
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState("");
   const availablePositions =
     modality === "FUTEBOL"
       ? positionOptionsFutebol
       : modality === "VOLEI"
         ? positionOptionsVolei
         : positionOptions;
+  const normalizedSearch = normalizeSearchValue(participantSearch);
+  const filteredEnrollments = useMemo(() => {
+    if (!normalizedSearch) {
+      return enrollments;
+    }
+
+    return enrollments.filter((enrollment) =>
+      [
+        enrollment.participantName,
+        enrollment.participantPhone,
+        enrollment.participantPosition,
+        levelLabels[enrollment.participantLevel] ?? enrollment.participantLevel,
+      ].some((value) => normalizeSearchValue(value).includes(normalizedSearch)),
+    );
+  }, [enrollments, normalizedSearch]);
 
   return (
     <div className="space-y-4">
@@ -116,7 +144,9 @@ export function EnrollmentManagement({
             type="button"
             variant={showBulkImport ? "secondary" : "outline"}
           >
-            {showBulkImport ? "Fechar importacao em massa" : "Subir atletas massivamente"}
+            {showBulkImport
+              ? "Fechar importacao em massa"
+              : "Subir atletas massivamente"}
           </Button>
         </div>
 
@@ -191,12 +221,15 @@ export function EnrollmentManagement({
             </h3>
             <p className="mt-1 text-sm text-slate-600">
               Cole uma linha por atleta usando o formato:
-              <span className="font-semibold"> nome;telefone;nivel;funcao</span>.
-              Se a funcao vier vazia, o sistema usa Versatil.
+              <span className="font-semibold"> nome;telefone;nivel;funcao</span>
+              . Se a funcao vier vazia, o sistema usa Versatil.
             </p>
           </div>
 
-          <form action={bulkAddOrganizerEnrollmentsAction} className="space-y-4">
+          <form
+            action={bulkAddOrganizerEnrollmentsAction}
+            className="space-y-4"
+          >
             <input name="rachaId" type="hidden" value={rachaId} />
 
             <label className="space-y-2 text-sm font-medium text-slate-700">
@@ -228,14 +261,47 @@ export function EnrollmentManagement({
         </Card>
       ) : null}
 
+      <Card className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-950">
+              Localizar participante
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Busque por nome, telefone, posição ou nível para encontrar mais
+              rápido.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md">
+            <Input
+              onChange={(event) => setParticipantSearch(event.target.value)}
+              placeholder="Ex.: João, 8599..., Atacante"
+              value={participantSearch}
+            />
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          {filteredEnrollments.length} de {enrollments.length} participante(s)
+          exibido(s)
+        </p>
+      </Card>
+
       {enrollments.length === 0 ? (
         <Card>
           <p className="text-sm text-slate-600">
             Nenhum participante inscrito ainda.
           </p>
         </Card>
+      ) : filteredEnrollments.length === 0 ? (
+        <Card>
+          <p className="text-sm text-slate-600">
+            Nenhum participante encontrado com esse filtro.
+          </p>
+        </Card>
       ) : (
-        enrollments.map((enrollment) => {
+        filteredEnrollments.map((enrollment) => {
           const unifiedStatus = getUnifiedEnrollmentStatus(enrollment);
 
           return (
@@ -264,6 +330,34 @@ export function EnrollmentManagement({
               </div>
 
               <div className="flex flex-wrap gap-3">
+                <form
+                  action={updateOrganizerEnrollmentLevelAction}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    name="enrollmentId"
+                    type="hidden"
+                    value={enrollment.id}
+                  />
+                  <Select
+                    defaultValue={enrollment.participantLevel}
+                    name="participantLevel"
+                  >
+                    {levelOptions.map((level) => (
+                      <option key={level.value} value={level.value}>
+                        {level.visual} {level.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <SubmitButton
+                    pendingLabel="Salvando..."
+                    size="sm"
+                    variant="outline"
+                  >
+                    Salvar nível
+                  </SubmitButton>
+                </form>
+
                 {!isGoalkeeperEnrollment(enrollment) &&
                 (enrollment.paymentStatus === "PENDING" ||
                   enrollment.paymentStatus === "PROOF_SENT") ? (
@@ -295,6 +389,53 @@ export function EnrollmentManagement({
                     </SubmitButton>
                   </form>
                 )}
+
+                <form action={removeOrganizerEnrollmentAction}>
+                  <input
+                    name="enrollmentId"
+                    type="hidden"
+                    value={enrollment.id}
+                  />
+                  <SubmitButton
+                    pendingLabel="Removendo..."
+                    size="sm"
+                    variant="outline"
+                  >
+                    Remover participante
+                  </SubmitButton>
+                </form>
+
+                <form
+                  action={toggleOrganizerNextRachaBlockAction}
+                  className="space-y-2"
+                >
+                  <input
+                    name="enrollmentId"
+                    type="hidden"
+                    value={enrollment.id}
+                  />
+                  <input
+                    name="active"
+                    type="hidden"
+                    value={enrollment.blockedForNextRacha ? "false" : "true"}
+                  />
+                  {!enrollment.blockedForNextRacha ? (
+                    <Input
+                      className="max-w-64"
+                      name="reason"
+                      placeholder="Motivo do bloqueio (opcional)"
+                    />
+                  ) : null}
+                  <SubmitButton
+                    pendingLabel="Atualizando..."
+                    size="sm"
+                    variant="outline"
+                  >
+                    {enrollment.blockedForNextRacha
+                      ? "Desbloquear próximo racha"
+                      : "Bloquear próximo racha"}
+                  </SubmitButton>
+                </form>
               </div>
             </Card>
           );

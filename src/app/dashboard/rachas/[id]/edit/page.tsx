@@ -8,6 +8,7 @@ import { EnrollmentManagement } from "@/components/enrollment-management";
 import { FlashMessage } from "@/components/flash-message";
 import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
+import { RachaAdminManagement } from "@/components/racha-admin-management";
 import { RachaForm } from "@/components/racha-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,7 +21,11 @@ import {
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ id: string }>;
-type SearchParams = Promise<{ status?: string; message?: string; field?: string }>;
+type SearchParams = Promise<{
+  status?: string;
+  message?: string;
+  field?: string;
+}>;
 
 export default async function EditRachaPage({
   params,
@@ -41,15 +46,66 @@ export default async function EditRachaPage({
   const racha = await prisma.racha.findUnique({
     where: { id },
     include: {
+      organizer: {
+        select: {
+          name: true,
+          phone: true,
+          email: true,
+        },
+      },
       enrollments: {
+        orderBy: [{ createdAt: "asc" }],
+      },
+      rachaAdmins: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+            },
+          },
+        },
         orderBy: [{ createdAt: "asc" }],
       },
     },
   });
 
-  if (!racha || racha.organizerId !== session.user.id) {
+  const canManageRacha = Boolean(
+    racha &&
+    (racha.organizerId === session.user.id ||
+      racha.rachaAdmins.some((item) => item.userId === session.user.id)),
+  );
+
+  if (!racha || !canManageRacha) {
     notFound();
   }
+
+  const activeBlocks = await prisma.organizerParticipantBlock.findMany({
+    where: {
+      organizerId: racha.organizerId,
+      active: true,
+      userId: {
+        in: racha.enrollments.map((item) => item.userId),
+      },
+    },
+    select: {
+      userId: true,
+      targetRachaId: true,
+      anchorEventDate: true,
+    },
+  });
+
+  const blockedUserIds = new Set(
+    activeBlocks
+      .filter(
+        (block) =>
+          (block.targetRachaId && block.targetRachaId === racha.id) ||
+          (!block.targetRachaId && racha.eventDate > block.anchorEventDate),
+      )
+      .map((block) => block.userId),
+  );
 
   const editPageUrl = `/dashboard/rachas/${racha.id}/edit`;
   const confirmedEnrollments = racha.enrollments.filter(isConfirmedEnrollment);
@@ -105,6 +161,12 @@ export default async function EditRachaPage({
       <FlashMessage status={query.status} message={query.message} />
 
       <RachaForm defaultValues={racha} />
+
+      <RachaAdminManagement
+        admins={racha.rachaAdmins}
+        organizer={racha.organizer}
+        rachaId={racha.id}
+      />
 
       <section className="space-y-4">
         <div>
@@ -201,7 +263,10 @@ export default async function EditRachaPage({
         </div>
 
         <EnrollmentManagement
-          enrollments={racha.enrollments}
+          enrollments={racha.enrollments.map((enrollment) => ({
+            ...enrollment,
+            blockedForNextRacha: blockedUserIds.has(enrollment.userId),
+          }))}
           modality={racha.modality}
           rachaId={racha.id}
         />

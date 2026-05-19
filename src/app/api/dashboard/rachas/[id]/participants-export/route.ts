@@ -84,7 +84,21 @@ export async function GET(
     },
   });
 
-  if (!racha || racha.organizerId !== session.user.id) {
+  const isCoAdmin = racha
+    ? Boolean(
+        await prisma.rachaAdmin.findUnique({
+          where: {
+            rachaId_userId: {
+              rachaId: racha.id,
+              userId: session.user.id,
+            },
+          },
+          select: { id: true },
+        }),
+      )
+    : false;
+
+  if (!racha || (racha.organizerId !== session.user.id && !isCoAdmin)) {
     return new Response("Racha não encontrado", { status: 404 });
   }
 

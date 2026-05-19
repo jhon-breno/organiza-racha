@@ -41,7 +41,21 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!racha || racha.organizerId !== session.user.id) {
+    const isCoAdmin = racha
+      ? Boolean(
+          await prisma.rachaAdmin.findUnique({
+            where: {
+              rachaId_userId: {
+                rachaId: racha.id,
+                userId: session.user.id,
+              },
+            },
+            select: { id: true },
+          }),
+        )
+      : false;
+
+    if (!racha || (racha.organizerId !== session.user.id && !isCoAdmin)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
@@ -84,10 +98,16 @@ function getStatusLabel(enrollment: {
   if (isConfirmedEnrollment(enrollment)) {
     return "Confirmado";
   }
-  if (enrollment.status === "ACTIVE" && enrollment.paymentStatus === "PENDING") {
+  if (
+    enrollment.status === "ACTIVE" &&
+    enrollment.paymentStatus === "PENDING"
+  ) {
     return "Aguardando pagamento";
   }
-  if (enrollment.status === "ACTIVE" && enrollment.paymentStatus === "PROOF_SENT") {
+  if (
+    enrollment.status === "ACTIVE" &&
+    enrollment.paymentStatus === "PROOF_SENT"
+  ) {
     return "Pagamento em análise";
   }
   return "Pendente";
@@ -133,8 +153,9 @@ function generateExcel(
         enrollment?.participantPhone ?? "",
         enrollment?.participantPosition ?? "",
         enrollment
-          ? levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
-            enrollment.participantLevel
+          ? levelLabels[
+              enrollment.participantLevel as keyof typeof levelLabels
+            ] || enrollment.participantLevel
           : "",
         enrollment ? getStatusLabel(enrollment) : "",
       ];
@@ -149,8 +170,9 @@ function generateExcel(
         enrollment?.participantPhone ?? "",
         enrollment?.participantPosition ?? "Goleiro",
         enrollment
-          ? levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
-            enrollment.participantLevel
+          ? levelLabels[
+              enrollment.participantLevel as keyof typeof levelLabels
+            ] || enrollment.participantLevel
           : "",
         enrollment ? getStatusLabel(enrollment) : "",
       ];
@@ -214,7 +236,10 @@ async function generatePDF(
     });
   };
 
-  const drawLine = (text: string, options?: { bold?: boolean; size?: number }) => {
+  const drawLine = (
+    text: string,
+    options?: { bold?: boolean; size?: number },
+  ) => {
     drawText(text, margin, y, options);
     y -= lineHeight;
   };

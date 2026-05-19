@@ -6,6 +6,7 @@ import {
   PaymentStatus,
   ParticipantStatus,
   Prisma,
+  RecurrenceFrequency,
   Visibility,
 } from "@prisma/client";
 import { AuthError } from "next-auth";
@@ -23,9 +24,14 @@ import {
   credentialsSignInSchema,
   enrollmentSchema,
   forgotPasswordSchema,
-  organizerEnrollmentSchema,
   organizerDataSettingsSchema,
+  organizerAddRachaAdminSchema,
+  organizerEnrollmentSchema,
   organizerPixSettingsSchema,
+  organizerRemoveRachaAdminSchema,
+  organizerRemoveEnrollmentSchema,
+  organizerToggleNextRachaBlockSchema,
+  organizerUpdateEnrollmentLevelSchema,
   recoverIdentifierSchema,
   resetPasswordSchema,
   refundRequestSchema,
@@ -360,7 +366,9 @@ async function createOrganizerEnrollmentForRacha(input: {
     ? PaymentStatus.PAID
     : PaymentStatus.PENDING;
   const nextPixPaid = isGoalkeeperEnrollment;
-  const normalizedPhone = normalizePhoneValue(input.enrollment.participantPhone);
+  const normalizedPhone = normalizePhoneValue(
+    input.enrollment.participantPhone,
+  );
   const participantUser = await getOrCreateParticipantUser({
     name: input.enrollment.participantName,
     phone: normalizedPhone,
@@ -460,6 +468,32 @@ async function requireUser(callbackUrl?: string) {
   }
 
   return session.user;
+}
+
+async function isUserRachaAdmin(userId: string, rachaId: string) {
+  const role = await prisma.rachaAdmin.findUnique({
+    where: {
+      rachaId_userId: {
+        rachaId,
+        userId,
+      },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(role);
+}
+
+async function canUserManageRacha(input: {
+  userId: string;
+  rachaId: string;
+  organizerId: string;
+}) {
+  if (input.organizerId === input.userId) {
+    return true;
+  }
+
+  return isUserRachaAdmin(input.userId, input.rachaId);
 }
 
 async function generateUniqueSlug(title: string, currentId?: string) {
@@ -979,6 +1013,8 @@ export async function createRachaAction(formData: FormData) {
     athleteLimit: getStringValue(formData, "athleteLimit"),
     eventDate: getStringValue(formData, "eventDate"),
     eventTime: getStringValue(formData, "eventTime"),
+    isRecurring: formData.get("isRecurring") === "true",
+    recurrenceFrequency: getStringValue(formData, "recurrenceFrequency"),
     paymentDeadlineDate: getStringValue(formData, "paymentDeadlineDate"),
     paymentDeadlineTime: getStringValue(formData, "paymentDeadlineTime"),
     locationName: getStringValue(formData, "locationName"),
@@ -1029,7 +1065,9 @@ export async function createRachaAction(formData: FormData) {
   const slug = await generateUniqueSlug(parsed.data.title);
   const organizerSettings = await getOrganizerRachaSettings(user.id);
   const organizerDisplayName =
-    organizerSettings?.organizerDisplayName || user.name?.trim() || "Organizador";
+    organizerSettings?.organizerDisplayName ||
+    user.name?.trim() ||
+    "Organizador";
   const phoneWhatsapp = organizerSettings?.phoneWhatsapp || "";
   const pixKey = organizerSettings?.pixKey || "";
 
@@ -1042,6 +1080,10 @@ export async function createRachaAction(formData: FormData) {
       rules: parsed.data.rules,
       athleteLimit: parsed.data.athleteLimit,
       eventDate,
+      isRecurring: parsed.data.isRecurring ?? false,
+      recurrenceFrequency: parsed.data.isRecurring
+        ? (parsed.data.recurrenceFrequency as RecurrenceFrequency | "") || null
+        : null,
       locationName: parsed.data.locationName,
       address: parsed.data.address,
       city: parsed.data.city,
@@ -1092,7 +1134,14 @@ export async function updateRachaAction(formData: FormData) {
 
   const existing = await prisma.racha.findUnique({ where: { id } });
 
-  if (!existing || existing.organizerId !== user.id) {
+  if (
+    !existing ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: existing.id,
+      organizerId: existing.organizerId,
+    }))
+  ) {
     redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
   }
 
@@ -1105,6 +1154,8 @@ export async function updateRachaAction(formData: FormData) {
     athleteLimit: getStringValue(formData, "athleteLimit"),
     eventDate: getStringValue(formData, "eventDate"),
     eventTime: getStringValue(formData, "eventTime"),
+    isRecurring: formData.get("isRecurring") === "true",
+    recurrenceFrequency: getStringValue(formData, "recurrenceFrequency"),
     paymentDeadlineDate: getStringValue(formData, "paymentDeadlineDate"),
     paymentDeadlineTime: getStringValue(formData, "paymentDeadlineTime"),
     locationName: getStringValue(formData, "locationName"),
@@ -1156,7 +1207,9 @@ export async function updateRachaAction(formData: FormData) {
   const slug = await generateUniqueSlug(parsed.data.title, id);
   const organizerSettings = await getOrganizerRachaSettings(user.id);
   const organizerDisplayName =
-    organizerSettings?.organizerDisplayName || user.name?.trim() || "Organizador";
+    organizerSettings?.organizerDisplayName ||
+    user.name?.trim() ||
+    "Organizador";
   const phoneWhatsapp = organizerSettings?.phoneWhatsapp || "";
   const pixKey = organizerSettings?.pixKey || "";
 
@@ -1170,6 +1223,10 @@ export async function updateRachaAction(formData: FormData) {
       rules: parsed.data.rules,
       athleteLimit: parsed.data.athleteLimit,
       eventDate,
+      isRecurring: parsed.data.isRecurring ?? false,
+      recurrenceFrequency: parsed.data.isRecurring
+        ? (parsed.data.recurrenceFrequency as RecurrenceFrequency | "") || null
+        : null,
       locationName: parsed.data.locationName,
       address: parsed.data.address,
       city: parsed.data.city,
@@ -1232,7 +1289,14 @@ export async function deleteRachaAction(formData: FormData) {
 
   const existing = await prisma.racha.findUnique({ where: { id } });
 
-  if (!existing || existing.organizerId !== user.id) {
+  if (
+    !existing ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: existing.id,
+      organizerId: existing.organizerId,
+    }))
+  ) {
     redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
   }
 
@@ -1400,6 +1464,39 @@ export async function joinRachaAction(formData: FormData) {
         phone: normalizedPhone,
       });
 
+  const activeBlock = await prisma.organizerParticipantBlock.findUnique({
+    where: {
+      organizerId_userId: {
+        organizerId: racha.organizerId,
+        userId: participantUser.id,
+      },
+    },
+  });
+
+  const isBlockForThisRacha =
+    Boolean(activeBlock?.active) &&
+    (activeBlock.targetRachaId
+      ? activeBlock.targetRachaId === racha.id
+      : racha.eventDate > activeBlock.anchorEventDate);
+
+  if (activeBlock?.active && isBlockForThisRacha) {
+    await prisma.organizerParticipantBlock.update({
+      where: { id: activeBlock.id },
+      data: {
+        active: false,
+        targetRachaId: null,
+      },
+    });
+
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Sua inscrição foi bloqueada para este racha pelo organizador.",
+      ),
+    );
+  }
+
   const existing = await prisma.enrollment.findUnique({
     where: {
       rachaId_userId: {
@@ -1552,7 +1649,14 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
     where: { id: parsed.data.rachaId },
   });
 
-  if (!racha || racha.organizerId !== user.id) {
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
     redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
   }
 
@@ -1636,7 +1740,14 @@ export async function bulkAddOrganizerEnrollmentsAction(formData: FormData) {
     where: { id: parsed.data.rachaId },
   });
 
-  if (!racha || racha.organizerId !== user.id) {
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
     redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
   }
 
@@ -1775,6 +1886,263 @@ export async function bulkAddOrganizerEnrollmentsAction(formData: FormData) {
       callbackUrl,
       "success",
       `${summaryParts.join(" • ")} com sucesso.`,
+    ),
+  );
+}
+
+export async function updateOrganizerEnrollmentLevelAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerUpdateEnrollmentLevelSchema.safeParse({
+    enrollmentId: getStringValue(formData, "enrollmentId"),
+    participantLevel: getStringValue(formData, "participantLevel"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível atualizar o nível.",
+      ),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: parsed.data.enrollmentId },
+    include: { racha: true },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      participantLevel: parsed.data.participantLevel,
+    },
+  });
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      "Nível do participante atualizado.",
+    ),
+  );
+}
+
+export async function removeOrganizerEnrollmentAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerRemoveEnrollmentSchema.safeParse({
+    enrollmentId: getStringValue(formData, "enrollmentId"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível remover o participante.",
+      ),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: parsed.data.enrollmentId },
+    include: { racha: true },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  if (
+    enrollment.status === ParticipantStatus.CANCELED &&
+    enrollment.paymentStatus === PaymentStatus.REFUNDED
+  ) {
+    redirect(
+      buildMessageUrl(
+        `/dashboard/rachas/${enrollment.rachaId}/edit`,
+        "error",
+        "Essa inscrição já foi finalizada.",
+      ),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      status: ParticipantStatus.CANCELED,
+      paymentStatus:
+        enrollment.paymentStatus === PaymentStatus.PAID
+          ? PaymentStatus.REFUND_REQUESTED
+          : enrollment.paymentStatus,
+      canceledAt: new Date(),
+      refundRequestedAt:
+        enrollment.paymentStatus === PaymentStatus.PAID
+          ? new Date()
+          : enrollment.refundRequestedAt,
+      notes:
+        `${enrollment.notes ?? ""}\n\n[Remoção pelo organizador]\nParticipante removido da lista do racha.`.trim(),
+    },
+  });
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      enrollment.paymentStatus === PaymentStatus.PAID
+        ? "Participante removido e marcado para reembolso."
+        : "Participante removido com sucesso.",
+    ),
+  );
+}
+
+export async function toggleOrganizerNextRachaBlockAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerToggleNextRachaBlockSchema.safeParse({
+    enrollmentId: getStringValue(formData, "enrollmentId"),
+    active: getStringValue(formData, "active") === "true",
+    reason: getStringValue(formData, "reason"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível atualizar o bloqueio.",
+      ),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: parsed.data.enrollmentId },
+    include: { racha: true },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+  const organizerId = enrollment.racha.organizerId;
+
+  if (!parsed.data.active) {
+    await prisma.organizerParticipantBlock.deleteMany({
+      where: {
+        organizerId,
+        userId: enrollment.userId,
+      },
+    });
+
+    revalidatePath(callbackUrl);
+    revalidatePath("/dashboard");
+
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "success",
+        "Bloqueio removido para os próximos rachas.",
+      ),
+    );
+  }
+
+  const nextRacha = await prisma.racha.findFirst({
+    where: {
+      organizerId,
+      status: "PUBLISHED",
+      eventDate: {
+        gt: enrollment.racha.eventDate,
+      },
+    },
+    orderBy: {
+      eventDate: "asc",
+    },
+    select: { id: true },
+  });
+
+  await prisma.organizerParticipantBlock.upsert({
+    where: {
+      organizerId_userId: {
+        organizerId,
+        userId: enrollment.userId,
+      },
+    },
+    create: {
+      organizerId,
+      userId: enrollment.userId,
+      blockedByEnrollmentId: enrollment.id,
+      active: true,
+      reason: parsed.data.reason || null,
+      anchorEventDate: enrollment.racha.eventDate,
+      targetRachaId: nextRacha?.id || null,
+    },
+    update: {
+      blockedByEnrollmentId: enrollment.id,
+      active: true,
+      reason: parsed.data.reason || null,
+      anchorEventDate: enrollment.racha.eventDate,
+      targetRachaId: nextRacha?.id || null,
+    },
+  });
+
+  revalidatePath(callbackUrl);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      nextRacha
+        ? "Participante bloqueado para o próximo racha deste organizador."
+        : "Participante bloqueado para o próximo racha que for criado.",
     ),
   );
 }
@@ -1949,7 +2317,14 @@ export async function confirmEnrollmentPaymentAction(formData: FormData) {
   const redirectUrl =
     callbackUrl || `/dashboard/rachas/${enrollment?.rachaId ?? ""}/edit`;
 
-  if (!enrollment || enrollment.racha.organizerId !== user.id) {
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
     redirect(
       buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
     );
@@ -1996,7 +2371,14 @@ export async function removeOrganizerPendingEnrollmentAction(
   const redirectUrl =
     callbackUrl || `/dashboard/rachas/${enrollment?.rachaId ?? ""}/edit`;
 
-  if (!enrollment || enrollment.racha.organizerId !== user.id) {
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
     redirect(
       buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
     );
@@ -2053,7 +2435,14 @@ export async function markEnrollmentRefundedAction(formData: FormData) {
     include: { racha: true },
   });
 
-  if (!enrollment || enrollment.racha.organizerId !== user.id) {
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
     redirect(
       buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
     );
@@ -2076,6 +2465,183 @@ export async function markEnrollmentRefundedAction(formData: FormData) {
       `/dashboard/rachas/${enrollment.rachaId}/edit`,
       "success",
       "Reembolso marcado como concluído.",
+    ),
+  );
+}
+
+export async function addRachaAdminAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerAddRachaAdminSchema.safeParse({
+    rachaId: getStringValue(formData, "rachaId"),
+    adminUserId: getStringValue(formData, "adminUserId"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível adicionar o administrador.",
+      ),
+    );
+  }
+
+  const callbackUrl = `/dashboard/rachas/${parsed.data.rachaId}/edit`;
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: parsed.data.rachaId },
+    select: { id: true, organizerId: true },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: parsed.data.rachaId,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
+  }
+
+  const adminUser = await prisma.user.findUnique({
+    where: { id: parsed.data.adminUserId },
+    select: { id: true },
+  });
+
+  if (!adminUser) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Usuário selecionado não foi encontrado.",
+      ),
+    );
+  }
+
+  if (adminUser.id === racha.organizerId) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Esse usuário já é o organizador principal do racha.",
+      ),
+    );
+  }
+
+  const existingRole = await prisma.rachaAdmin.findUnique({
+    where: {
+      rachaId_userId: {
+        rachaId: racha.id,
+        userId: adminUser.id,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingRole) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Esse usuário já está como admin deste racha.",
+      ),
+    );
+  }
+
+  await prisma.rachaAdmin.create({
+    data: {
+      rachaId: racha.id,
+      userId: adminUser.id,
+    },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath(callbackUrl);
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      "Administrador adicionado ao racha com sucesso.",
+    ),
+  );
+}
+
+export async function removeRachaAdminAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerRemoveRachaAdminSchema.safeParse({
+    rachaId: getStringValue(formData, "rachaId"),
+    adminUserId: getStringValue(formData, "adminUserId"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível remover o administrador.",
+      ),
+    );
+  }
+
+  const callbackUrl = `/dashboard/rachas/${parsed.data.rachaId}/edit`;
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: parsed.data.rachaId },
+    select: { id: true, organizerId: true },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: parsed.data.rachaId,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
+  }
+
+  if (parsed.data.adminUserId === racha.organizerId) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "O organizador principal não pode ser removido.",
+      ),
+    );
+  }
+
+  const removed = await prisma.rachaAdmin.deleteMany({
+    where: {
+      rachaId: parsed.data.rachaId,
+      userId: parsed.data.adminUserId,
+    },
+  });
+
+  if (removed.count === 0) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Administrador não encontrado nesse racha.",
+      ),
+    );
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(callbackUrl);
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      "Administrador removido com sucesso.",
     ),
   );
 }

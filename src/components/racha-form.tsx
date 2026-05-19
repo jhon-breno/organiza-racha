@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   futebolTypeOptions,
   modalities,
+  recurrenceFrequencyOptions,
   visibilityOptions,
   voleiTypeOptions,
   voleiTypesWithSetter,
@@ -26,6 +27,8 @@ type RachaFormValues = {
   rules?: string;
   athleteLimit?: number;
   eventDate?: Date;
+  isRecurring?: boolean;
+  recurrenceFrequency?: string | null;
   paymentDeadline?: Date | null;
   locationName?: string;
   address?: string;
@@ -72,6 +75,9 @@ export function RachaForm({
   const [voleiType, setVoleiType] = useState(defaultValues?.voleiType ?? "");
   const [hasFixedSetter, setHasFixedSetter] = useState(
     defaultValues?.hasFixedSetter ?? false,
+  );
+  const [isRecurring, setIsRecurring] = useState(
+    defaultValues?.isRecurring ?? false,
   );
 
   const isFutebol = modality === "FUTEBOL";
@@ -142,6 +148,10 @@ export function RachaForm({
                 element.dispatchEvent(new Event("change", { bubbles: true }));
               }
 
+              if (element.name === "isRecurring") {
+                element.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+
               return;
             }
 
@@ -196,6 +206,7 @@ export function RachaForm({
     modality,
     voleiType,
     hasFixedSetter,
+    isRecurring,
     visibility,
   ]);
 
@@ -430,6 +441,39 @@ export function RachaForm({
               required
             />
           </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 lg:col-span-3">
+            <input
+              checked={isRecurring}
+              className="mt-1 h-4 w-4 rounded border-slate-300"
+              name="isRecurring"
+              onChange={(e) => setIsRecurring(e.target.checked)}
+              type="checkbox"
+              value="true"
+            />
+            <span>
+              <strong>Racha recorrente</strong> — repete automaticamente na
+              frequência escolhida, mantendo o mesmo horário até você editar.
+            </span>
+          </label>
+
+          {isRecurring ? (
+            <label className="space-y-2 text-sm font-medium text-slate-700 lg:col-span-2">
+              Frequência
+              <Select
+                defaultValue={defaultValues?.recurrenceFrequency ?? "WEEKLY"}
+                name="recurrenceFrequency"
+              >
+                {recurrenceFrequencyOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          ) : (
+            <input name="recurrenceFrequency" type="hidden" value="" />
+          )}
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Prazo pagamento (data)

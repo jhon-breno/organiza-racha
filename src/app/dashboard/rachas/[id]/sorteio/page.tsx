@@ -29,7 +29,21 @@ export default async function RachaTeamDrawPage({
     },
   });
 
-  if (!racha || racha.organizerId !== session.user.id) {
+  const isCoAdmin = racha
+    ? Boolean(
+        await prisma.rachaAdmin.findUnique({
+          where: {
+            rachaId_userId: {
+              rachaId: racha.id,
+              userId: session.user.id,
+            },
+          },
+          select: { id: true },
+        }),
+      )
+    : false;
+
+  if (!racha || (racha.organizerId !== session.user.id && !isCoAdmin)) {
     notFound();
   }
 
@@ -54,8 +68,8 @@ export default async function RachaTeamDrawPage({
             {racha.title}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">
-            Revise os participantes confirmados, os niveis em estrelas e gere
-            os times em uma pagina dedicada.
+            Revise os participantes confirmados, os niveis em estrelas e gere os
+            times em uma pagina dedicada.
           </p>
         </div>
 
@@ -63,7 +77,11 @@ export default async function RachaTeamDrawPage({
           <Button asChild href={`/rachas/${racha.slug}`} variant="outline">
             Ver pagina publica
           </Button>
-          <Button asChild href={`/dashboard/rachas/${racha.id}/edit`} variant="ghost">
+          <Button
+            asChild
+            href={`/dashboard/rachas/${racha.id}/edit`}
+            variant="ghost"
+          >
             Voltar ao racha
           </Button>
         </div>

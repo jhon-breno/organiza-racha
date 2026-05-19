@@ -13,6 +13,7 @@ import {
   modalityLabels,
   paymentStatusLabels,
   participantStatusLabels,
+  recurrenceFrequencyLabels,
   voleiTypeLabels,
 } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
@@ -23,7 +24,10 @@ import {
   getRachaCoverImageUrl,
   getInitials,
 } from "@/lib/utils";
-import { isConfirmedEnrollment, isGoalkeeperEnrollment } from "@/lib/enrollment";
+import {
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+} from "@/lib/enrollment";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<{ status?: string; message?: string }>;
@@ -127,6 +131,13 @@ export default async function RachaDetailsPage({
               <Badge className="bg-white/15 text-white ring-1 ring-white/20">
                 {racha.visibility === "PRIVATE" ? "Privado" : "Aberto"}
               </Badge>
+              {racha.isRecurring && racha.recurrenceFrequency ? (
+                <Badge className="bg-white/15 text-white ring-1 ring-white/20">
+                  Recorrente:{" "}
+                  {recurrenceFrequencyLabels[racha.recurrenceFrequency] ??
+                    racha.recurrenceFrequency}
+                </Badge>
+              ) : null}
             </div>
 
             <div className="space-y-3">

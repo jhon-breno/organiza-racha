@@ -80,6 +80,12 @@ export const visibilityOptions = [
   { value: "PRIVATE", label: "Privado com chave secreta" },
 ] as const;
 
+export const recurrenceFrequencyOptions = [
+  { value: "WEEKLY", label: "Toda semana" },
+  { value: "BIWEEKLY", label: "A cada 2 semanas" },
+  { value: "MONTHLY", label: "Todo mês" },
+] as const;
+
 export const levelOptions = participantLevelOptions;
 
 export const positionOptionsFutebol = [
@@ -136,20 +142,28 @@ export const visibilityLabels = Object.fromEntries(
   visibilityOptions.map((item) => [item.value, item.label]),
 ) as Record<string, string>;
 
-export const levelLabels = Object.fromEntries(
-  [
-    ...participantLevelOptions.map((item) => [
-      item.value,
-      `${item.visual} ${item.label}`,
-    ]),
-    ["INICIANTE", `${getParticipantLevelVisual("INICIANTE")} ${getParticipantLevelLabel("INICIANTE")}`],
-    [
-      "INTERMEDIARIO",
-      `${getParticipantLevelVisual("INTERMEDIARIO")} ${getParticipantLevelLabel("INTERMEDIARIO")}`,
-    ],
-    ["AVANCADO", `${getParticipantLevelVisual("AVANCADO")} ${getParticipantLevelLabel("AVANCADO")}`],
-  ],
+export const recurrenceFrequencyLabels = Object.fromEntries(
+  recurrenceFrequencyOptions.map((item) => [item.value, item.label]),
 ) as Record<string, string>;
+
+export const levelLabels = Object.fromEntries([
+  ...participantLevelOptions.map((item) => [
+    item.value,
+    `${item.visual} ${item.label}`,
+  ]),
+  [
+    "INICIANTE",
+    `${getParticipantLevelVisual("INICIANTE")} ${getParticipantLevelLabel("INICIANTE")}`,
+  ],
+  [
+    "INTERMEDIARIO",
+    `${getParticipantLevelVisual("INTERMEDIARIO")} ${getParticipantLevelLabel("INTERMEDIARIO")}`,
+  ],
+  [
+    "AVANCADO",
+    `${getParticipantLevelVisual("AVANCADO")} ${getParticipantLevelLabel("AVANCADO")}`,
+  ],
+]) as Record<string, string>;
 
 export const participantStatusLabels: Record<string, string> = {
   ACTIVE: "Confirmado",

@@ -29,6 +29,11 @@ export const rachaFormSchema = z
       .max(200, "Limite máximo de 200 atletas."),
     eventDate: z.string().min(1, "Informe a data do racha."),
     eventTime: z.string().min(1, "Informe o horário do racha."),
+    isRecurring: z.coerce.boolean().optional(),
+    recurrenceFrequency: z
+      .enum(["WEEKLY", "BIWEEKLY", "MONTHLY"])
+      .optional()
+      .or(z.literal("")),
     paymentDeadlineDate: z.string().optional().or(z.literal("")),
     paymentDeadlineTime: z.string().optional().or(z.literal("")),
     locationName: z.string().min(3, "Informe o nome do local."),
@@ -119,6 +124,14 @@ export const rachaFormSchema = z
       });
     }
 
+    if (data.isRecurring && !data.recurrenceFrequency) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["recurrenceFrequency"],
+        message: "Selecione a frequência para rachas recorrentes.",
+      });
+    }
+
     if (hasPaymentDeadlineDate !== hasPaymentDeadlineTime) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -176,34 +189,37 @@ export const rachaFormSchema = z
     }
   });
 
-export const enrollmentSchema = z.object({
-  rachaId: z.string().min(1),
-  slug: z.string().min(1),
-  participantName: z.string().min(2, "Informe seu nome."),
-  participantPhone: z.string().min(8, "Informe um telefone válido."),
-  participantPosition: z.string().min(2, "Informe sua posição."),
-  participantLevel: z.enum(participantLevelValues),
-  notes: z
-    .string()
-    .max(280, "Observações com no máximo 280 caracteres.")
-    .optional()
-    .or(z.literal("")),
-  acceptedRules: z.coerce
-    .boolean()
-    .refine((value) => value, "Você deve aceitar as regras."),
-  paymentCommitment: z.coerce
-    .boolean()
-    .default(false),
-  accessKey: z.string().optional().or(z.literal("")),
-}).superRefine((data, context) => {
-  if (!isGoalkeeperPosition(data.participantPosition) && !data.paymentCommitment) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["paymentCommitment"],
-      message: "Confirme que só estará na lista após realizar o pagamento.",
-    });
-  }
-});
+export const enrollmentSchema = z
+  .object({
+    rachaId: z.string().min(1),
+    slug: z.string().min(1),
+    participantName: z.string().min(2, "Informe seu nome."),
+    participantPhone: z.string().min(8, "Informe um telefone válido."),
+    participantPosition: z.string().min(2, "Informe sua posição."),
+    participantLevel: z.enum(participantLevelValues),
+    notes: z
+      .string()
+      .max(280, "Observações com no máximo 280 caracteres.")
+      .optional()
+      .or(z.literal("")),
+    acceptedRules: z.coerce
+      .boolean()
+      .refine((value) => value, "Você deve aceitar as regras."),
+    paymentCommitment: z.coerce.boolean().default(false),
+    accessKey: z.string().optional().or(z.literal("")),
+  })
+  .superRefine((data, context) => {
+    if (
+      !isGoalkeeperPosition(data.participantPosition) &&
+      !data.paymentCommitment
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["paymentCommitment"],
+        message: "Confirme que só estará na lista após realizar o pagamento.",
+      });
+    }
+  });
 
 export const organizerEnrollmentSchema = z.object({
   rachaId: z.string().min(1, "Racha inválido."),
@@ -224,6 +240,31 @@ export const bulkOrganizerEnrollmentSchema = z.object({
     .string()
     .trim()
     .min(1, "Cole pelo menos uma linha para importar os participantes."),
+});
+
+export const organizerUpdateEnrollmentLevelSchema = z.object({
+  enrollmentId: z.string().min(1, "Inscrição inválida."),
+  participantLevel: z.enum(participantLevelValues),
+});
+
+export const organizerRemoveEnrollmentSchema = z.object({
+  enrollmentId: z.string().min(1, "Inscrição inválida."),
+});
+
+export const organizerToggleNextRachaBlockSchema = z.object({
+  enrollmentId: z.string().min(1, "Inscrição inválida."),
+  active: z.coerce.boolean(),
+  reason: z.string().trim().max(280).optional().or(z.literal("")),
+});
+
+export const organizerAddRachaAdminSchema = z.object({
+  rachaId: z.string().min(1, "Racha inválido."),
+  adminUserId: z.string().min(1, "Selecione um usuário para adicionar."),
+});
+
+export const organizerRemoveRachaAdminSchema = z.object({
+  rachaId: z.string().min(1, "Racha inválido."),
+  adminUserId: z.string().min(1, "Administrador inválido."),
 });
 
 export const refundRequestSchema = z.object({

@@ -116,9 +116,28 @@ export default async function DashboardPage({
     typeof organizerProfile.email === "string" ? organizerProfile.email : "";
 
   const rachas = await prisma.racha.findMany({
-    where: { organizerId: session.user.id },
+    where: {
+      OR: [
+        { organizerId: session.user.id },
+        {
+          rachaAdmins: {
+            some: {
+              userId: session.user.id,
+            },
+          },
+        },
+      ],
+    },
     include: {
       enrollments: true,
+      rachaAdmins: {
+        where: {
+          userId: session.user.id,
+        },
+        select: {
+          id: true,
+        },
+      },
     },
     orderBy: [{ eventDate: "asc" }],
   });
@@ -308,7 +327,12 @@ export default async function DashboardPage({
       ) : (
         <div className="grid gap-6">
           {rachas.map((racha) => {
-            const confirmedEnrollments = racha.enrollments.filter(isConfirmedEnrollment);
+            const isInvitedAdmin =
+              racha.organizerId !== session.user.id &&
+              racha.rachaAdmins.length > 0;
+            const confirmedEnrollments = racha.enrollments.filter(
+              isConfirmedEnrollment,
+            );
             const confirmed = confirmedEnrollments.filter(
               (item) => !isGoalkeeperEnrollment(item),
             ).length;
@@ -327,7 +351,8 @@ export default async function DashboardPage({
                 paymentStatus: item.paymentStatus,
               }));
             const totalAthletes = racha.enrollments.filter(
-              (item) => isVisibleEnrollment(item) && !isGoalkeeperEnrollment(item),
+              (item) =>
+                isVisibleEnrollment(item) && !isGoalkeeperEnrollment(item),
             ).length;
 
             return (
@@ -341,6 +366,11 @@ export default async function DashboardPage({
                       <Badge className="bg-slate-100 text-slate-700">
                         {racha.visibility === "PRIVATE" ? "Privado" : "Aberto"}
                       </Badge>
+                      {isInvitedAdmin ? (
+                        <Badge className="bg-teal-100 text-teal-800">
+                          Admin convidado
+                        </Badge>
+                      ) : null}
                       {!racha.pixKey.trim() ? (
                         <Badge className="bg-amber-100 text-amber-800">
                           Aguardando PIX
@@ -357,7 +387,8 @@ export default async function DashboardPage({
                     </p>
                     {!racha.pixKey.trim() ? (
                       <p className="text-sm text-amber-700">
-                        Configure a chave PIX do organizador para publicar este racha e liberar inscricoes.
+                        Configure a chave PIX do organizador para publicar este
+                        racha e liberar inscricoes.
                       </p>
                     ) : null}
                   </div>
