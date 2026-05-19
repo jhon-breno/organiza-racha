@@ -27,12 +27,14 @@ import {
   forgotPasswordSchema,
   organizerDataSettingsSchema,
   organizerAddRachaAdminSchema,
+  organizerBulkCancelPendingEnrollmentsSchema,
   organizerEnrollmentSchema,
   organizerPixSettingsSchema,
   organizerRemoveRachaAdminSchema,
   organizerRemoveEnrollmentSchema,
   organizerToggleNextRachaBlockSchema,
   organizerUpdateEnrollmentLevelSchema,
+  organizerUpdateEnrollmentStatusSchema,
   recoverIdentifierSchema,
   resetPasswordSchema,
   refundRequestSchema,
@@ -53,6 +55,33 @@ function getStringValue(formData: FormData, key: string) {
 function getFirstIssueFieldName(issues: { path: PropertyKey[] }[]) {
   const firstPathEntry = issues[0]?.path?.[0];
   return typeof firstPathEntry === "string" ? firstPathEntry : undefined;
+}
+
+function buildEnrollmentStatusUpdate(input: {
+  status: ParticipantStatus;
+  paymentStatus: PaymentStatus;
+  canceledAt: Date | null;
+  refundRequestedAt: Date | null;
+}) {
+  const now = new Date();
+  const refundedState =
+    input.paymentStatus === PaymentStatus.REFUND_REQUESTED ||
+    input.paymentStatus === PaymentStatus.REFUNDED;
+  const paidState =
+    input.paymentStatus === PaymentStatus.PAID || refundedState;
+
+  return {
+    status: input.status,
+    paymentStatus: input.paymentStatus,
+    pixPaid: paidState,
+    canceledAt:
+      input.status === ParticipantStatus.CANCELED
+        ? (input.canceledAt ?? now)
+        : null,
+    refundRequestedAt: refundedState
+      ? (input.refundRequestedAt ?? now)
+      : null,
+  };
 }
 
 function supportsUserField(fieldName: string) {
@@ -1962,6 +1991,164 @@ export async function updateOrganizerEnrollmentLevelAction(formData: FormData) {
       callbackUrl,
       "success",
       "Nível do participante atualizado.",
+    ),
+  );
+}
+
+export async function updateOrganizerEnrollmentStatusAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerUpdateEnrollmentStatusSchema.safeParse({
+    enrollmentId: getStringValue(formData, "enrollmentId"),
+    status: getStringValue(formData, "status"),
+    paymentStatus: getStringValue(formData, "paymentStatus"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível atualizar o status da inscrição.",
+      ),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: parsed.data.enrollmentId },
+    include: { racha: true },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: buildEnrollmentStatusUpdate({
+      status: parsed.data.status,
+      paymentStatus: parsed.data.paymentStatus,
+      canceledAt: enrollment.canceledAt,
+      refundRequestedAt: enrollment.refundRequestedAt,
+    }),
+  });
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      "Status do participante atualizado.",
+    ),
+  );
+}
+
+export async function cancelPendingPaymentEnrollmentsAction(
+  formData: FormData,
+) {
+  const user = await requireUser("/dashboard");
+
+  const parsed = organizerBulkCancelPendingEnrollmentsSchema.safeParse({
+    rachaId: getStringValue(formData, "rachaId"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível cancelar as inscrições pendentes.",
+      ),
+    );
+  }
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: parsed.data.rachaId },
+    select: {
+      id: true,
+      slug: true,
+      organizerId: true,
+      enrollments: {
+        where: {
+          status: {
+            not: ParticipantStatus.CANCELED,
+          },
+          paymentStatus: {
+            in: [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT],
+          },
+        },
+        select: {
+          id: true,
+          participantPosition: true,
+        },
+      },
+    },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
+  }
+
+  const enrollmentIds = racha.enrollments
+    .filter((enrollment) => !isGoalkeeperPosition(enrollment.participantPosition))
+    .map((enrollment) => enrollment.id);
+
+  const callbackUrl = `/dashboard/rachas/${racha.id}/edit`;
+
+  if (!enrollmentIds.length) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Nenhuma inscrição pendente de pagamento foi encontrada para cancelamento.",
+      ),
+    );
+  }
+
+  const result = await prisma.enrollment.updateMany({
+    where: {
+      id: {
+        in: enrollmentIds,
+      },
+    },
+    data: {
+      status: ParticipantStatus.CANCELED,
+      canceledAt: new Date(),
+    },
+  });
+
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${racha.slug}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      `${result.count} inscrição(ões) pendente(s) cancelada(s).`,
     ),
   );
 }

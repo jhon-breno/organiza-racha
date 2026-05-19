@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import {
   addOrganizerEnrollmentAction,
   bulkAddOrganizerEnrollmentsAction,
+  cancelPendingPaymentEnrollmentsAction,
   confirmEnrollmentPaymentAction,
   markEnrollmentRefundedAction,
   removeOrganizerEnrollmentAction,
   toggleOrganizerNextRachaBlockAction,
   updateOrganizerEnrollmentLevelAction,
+  updateOrganizerEnrollmentStatusAction,
 } from "@/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,20 @@ import {
   isGoalkeeperEnrollment,
 } from "@/lib/enrollment";
 import { formatDateTimeShort } from "@/lib/utils";
+
+const participantStatusOptions = [
+  { value: "ACTIVE", label: "Ativa" },
+  { value: "WAITLIST", label: "Lista de espera" },
+  { value: "CANCELED", label: "Cancelada" },
+];
+
+const paymentStatusOptions = [
+  { value: "PENDING", label: "Aguardando pagamento" },
+  { value: "PROOF_SENT", label: "Comprovante enviado" },
+  { value: "PAID", label: "Pago" },
+  { value: "REFUND_REQUESTED", label: "Reembolso solicitado" },
+  { value: "REFUNDED", label: "Reembolsado" },
+];
 
 function normalizeSearchValue(value: string) {
   return value
@@ -281,6 +297,13 @@ export function EnrollmentManagement({
           </div>
         </div>
 
+        <form action={cancelPendingPaymentEnrollmentsAction}>
+          <input name="rachaId" type="hidden" value={rachaId} />
+          <SubmitButton pendingLabel="Cancelando..." size="sm" variant="danger">
+            Cancelar Inscrições Pendentes Pagamento.
+          </SubmitButton>
+        </form>
+
         <p className="text-xs text-slate-500">
           {filteredEnrollments.length} de {enrollments.length} participante(s)
           exibido(s)
@@ -354,6 +377,42 @@ export function EnrollmentManagement({
                     variant="outline"
                   >
                     Salvar nível
+                  </SubmitButton>
+                </form>
+
+                <form
+                  action={updateOrganizerEnrollmentStatusAction}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <input
+                    name="enrollmentId"
+                    type="hidden"
+                    value={enrollment.id}
+                  />
+                  <Select className="min-w-40" defaultValue={enrollment.status} name="status">
+                    {participantStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    className="min-w-52"
+                    defaultValue={enrollment.paymentStatus}
+                    name="paymentStatus"
+                  >
+                    {paymentStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <SubmitButton
+                    pendingLabel="Salvando..."
+                    size="sm"
+                    variant="outline"
+                  >
+                    Salvar status
                   </SubmitButton>
                 </form>
 

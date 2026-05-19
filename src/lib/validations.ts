@@ -258,6 +258,60 @@ export const organizerRemoveEnrollmentSchema = z.object({
   enrollmentId: z.string().min(1, "Inscrição inválida."),
 });
 
+export const organizerBulkCancelPendingEnrollmentsSchema = z.object({
+  rachaId: z.string().min(1, "Racha inválido."),
+});
+
+export const organizerUpdateEnrollmentStatusSchema = z
+  .object({
+    enrollmentId: z.string().min(1, "Inscrição inválida."),
+    status: z.enum(["ACTIVE", "WAITLIST", "CANCELED"]),
+    paymentStatus: z.enum([
+      "PENDING",
+      "PROOF_SENT",
+      "PAID",
+      "REFUND_REQUESTED",
+      "REFUNDED",
+    ]),
+  })
+  .superRefine((data, ctx) => {
+    const refundState =
+      data.paymentStatus === "REFUND_REQUESTED" ||
+      data.paymentStatus === "REFUNDED";
+
+    if (refundState && data.status !== "CANCELED") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["status"],
+        message: "Status de reembolso exige inscrição cancelada.",
+      });
+    }
+
+    if (data.status === "ACTIVE" && data.paymentStatus === "REFUNDED") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["paymentStatus"],
+        message: "Inscrição ativa não pode estar reembolsada.",
+      });
+    }
+
+    if (data.status === "WAITLIST" && refundState) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["paymentStatus"],
+        message: "Lista de espera não pode estar em reembolso.",
+      });
+    }
+
+    if (data.status === "CANCELED" && data.paymentStatus === "PAID") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["paymentStatus"],
+        message: "Para inscrições canceladas pagas, use reembolso solicitado.",
+      });
+    }
+  });
+
 export const organizerToggleNextRachaBlockSchema = z.object({
   enrollmentId: z.string().min(1, "Inscrição inválida."),
   active: z.coerce.boolean(),

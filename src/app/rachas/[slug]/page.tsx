@@ -283,55 +283,6 @@ export default async function RachaDetailsPage({
             </p>
             <MapPreview query={racha.mapsQuery} title={racha.title} />
           </Card>
-
-          {hasPrivateAccess ? (
-            <Card className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-950">Atletas</h2>
-                  <p className="text-sm text-slate-600">
-                    Participantes inscritos e status atual.
-                  </p>
-                </div>
-                <Badge>{confirmedPaidParticipants.length} confirmados</Badge>
-              </div>
-
-              <div className="grid gap-3">
-                {confirmedPaidParticipants.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    Ainda não há participantes confirmados para o racha.
-                  </p>
-                ) : (
-                  confirmedPaidParticipants.map((participant) => (
-                    <div
-                      key={participant.id}
-                      className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-950">
-                          {participant.participantName}
-                        </p>
-                        <p className="text-sm text-slate-600">
-                          {participant.participantPosition} •{" "}
-                          {participant.participantPhone}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge>
-                          {participantStatusLabels[participant.status] ??
-                            participant.status}
-                        </Badge>
-                        <Badge className="bg-slate-100 text-slate-700">
-                          {paymentStatusLabels[participant.paymentStatus] ??
-                            participant.paymentStatus}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-          ) : null}
         </div>
 
         <div className="space-y-6">
@@ -386,6 +337,57 @@ export default async function RachaDetailsPage({
             </p>
           </Card>
         </div>
+
+        {hasPrivateAccess ? (
+          <div className="xl:col-start-1">
+            <Card className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-950">Atletas</h2>
+                  <p className="text-sm text-slate-600">
+                    Participantes inscritos e status atual.
+                  </p>
+                </div>
+                <Badge>{confirmedPaidParticipants.length} confirmados</Badge>
+              </div>
+
+              <div className="grid gap-3">
+                {confirmedPaidParticipants.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    Ainda não há participantes confirmados para o racha.
+                  </p>
+                ) : (
+                  confirmedPaidParticipants.map((participant) => (
+                    <div
+                      key={participant.id}
+                      className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-950">
+                          {participant.participantName}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {participant.participantPosition} •{" "}
+                          {participant.participantPhone}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge>
+                          {participantStatusLabels[participant.status] ??
+                            participant.status}
+                        </Badge>
+                        <Badge className="bg-slate-100 text-slate-700">
+                          {paymentStatusLabels[participant.paymentStatus] ??
+                            participant.paymentStatus}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
+        ) : null}
       </div>
     </div>
   );
