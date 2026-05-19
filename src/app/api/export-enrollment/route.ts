@@ -16,6 +16,18 @@ import { formatDateTimeShort } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
+function getExportTypeLabel(type: string) {
+  if (type === "confirmed") {
+    return "Apenas confirmados";
+  }
+
+  if (type === "waitlist") {
+    return "Lista de espera";
+  }
+
+  return "Todos os atletas";
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -66,6 +78,10 @@ export async function GET(request: NextRequest) {
 
     if (type === "confirmed") {
       enrollments = enrollments.filter(isConfirmedEnrollment);
+    } else if (type === "waitlist") {
+      enrollments = enrollments.filter(
+        (item) => item.status === "WAITLIST" && isVisibleEnrollment(item),
+      );
     } else if (type === "all") {
       enrollments = enrollments.filter(isVisibleEnrollment);
     }
@@ -93,6 +109,12 @@ function getGoalkeeperEnrollments(enrollments: Enrollment[]) {
     .sort(compareEnrollmentsForExport);
 }
 
+function getWaitlistEnrollments(enrollments: Enrollment[]) {
+  return enrollments
+    .filter((item) => item.status === "WAITLIST")
+    .sort(compareEnrollmentsForExport);
+}
+
 function generateExcel(
   racha: Racha,
   enrollments: Enrollment[],
@@ -108,54 +130,85 @@ function generateExcel(
     "Status",
   ];
 
-  const lineEnrollments = getLineEnrollments(enrollments);
-  const goalkeeperEnrollments = getGoalkeeperEnrollments(enrollments);
+  const waitlistEnrollments = getWaitlistEnrollments(enrollments);
+  const isWaitlistOnly = type === "waitlist";
+  const isAll = type === "all";
+  const mainEnrollments = isAll
+    ? enrollments.filter((item) => item.status !== "WAITLIST")
+    : enrollments;
+  const lineEnrollments = getLineEnrollments(mainEnrollments);
+  const goalkeeperEnrollments = getGoalkeeperEnrollments(mainEnrollments);
   const goalkeeperSlots = Math.max(
     racha.goalkeeperLimit ?? 0,
     goalkeeperEnrollments.length,
   );
-  const rows = [
-    ...Array.from({ length: racha.athleteLimit }, (_, index) => {
-      const enrollment = lineEnrollments[index];
-
-      return [
-        "Atleta",
+  const rows = isWaitlistOnly
+    ? waitlistEnrollments.map((enrollment, index) => [
+        "Lista de espera",
         (index + 1).toString(),
-        enrollment?.participantName ?? "",
-        enrollment?.participantPhone ?? "",
-        enrollment?.participantPosition ?? "",
-        enrollment
-          ? levelLabels[
-              enrollment.participantLevel as keyof typeof levelLabels
-            ] || enrollment.participantLevel
-          : "",
-        enrollment ? getEnrollmentStatusLabel(enrollment) : "",
-      ];
-    }),
-    ...Array.from({ length: goalkeeperSlots }, (_, index) => {
-      const enrollment = goalkeeperEnrollments[index];
+        enrollment.participantName,
+        enrollment.participantPhone,
+        enrollment.participantPosition,
+        levelLabels[
+          enrollment.participantLevel as keyof typeof levelLabels
+        ] || enrollment.participantLevel,
+        getEnrollmentStatusLabel(enrollment),
+      ])
+    : [
+        ...Array.from({ length: racha.athleteLimit }, (_, index) => {
+          const enrollment = lineEnrollments[index];
 
-      return [
-        "Goleiro",
-        (index + 1).toString(),
-        enrollment?.participantName ?? "",
-        enrollment?.participantPhone ?? "",
-        enrollment?.participantPosition ?? "Goleiro",
-        enrollment
-          ? levelLabels[
-              enrollment.participantLevel as keyof typeof levelLabels
-            ] || enrollment.participantLevel
-          : "",
-        enrollment ? getEnrollmentStatusLabel(enrollment) : "",
+          return [
+            "Atleta",
+            (index + 1).toString(),
+            enrollment?.participantName ?? "",
+            enrollment?.participantPhone ?? "",
+            enrollment?.participantPosition ?? "",
+            enrollment
+              ? levelLabels[
+                  enrollment.participantLevel as keyof typeof levelLabels
+                ] || enrollment.participantLevel
+              : "",
+            enrollment ? getEnrollmentStatusLabel(enrollment) : "",
+          ];
+        }),
+        ...Array.from({ length: goalkeeperSlots }, (_, index) => {
+          const enrollment = goalkeeperEnrollments[index];
+
+          return [
+            "Goleiro",
+            (index + 1).toString(),
+            enrollment?.participantName ?? "",
+            enrollment?.participantPhone ?? "",
+            enrollment?.participantPosition ?? "Goleiro",
+            enrollment
+              ? levelLabels[
+                  enrollment.participantLevel as keyof typeof levelLabels
+                ] || enrollment.participantLevel
+              : "",
+            enrollment ? getEnrollmentStatusLabel(enrollment) : "",
+          ];
+        }),
+        ...(isAll
+          ? waitlistEnrollments.map((enrollment, index) => [
+              "Lista de espera",
+              (index + 1).toString(),
+              enrollment.participantName,
+              enrollment.participantPhone,
+              enrollment.participantPosition,
+              levelLabels[
+                enrollment.participantLevel as keyof typeof levelLabels
+              ] || enrollment.participantLevel,
+              getEnrollmentStatusLabel(enrollment),
+            ])
+          : []),
       ];
-    }),
-  ];
 
   const csv = [
     `Racha: ${racha.title}`,
     `Local: ${racha.locationName}`,
     `Data e hora: ${formatDateTimeShort(racha.eventDate)}`,
-    `Tipo: ${type === "confirmed" ? "Apenas confirmados" : "Todos os atletas"}`,
+    `Tipo: ${getExportTypeLabel(type)}`,
     "",
     headers.join(","),
     ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
@@ -186,8 +239,14 @@ async function generatePDF(
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
   const lineHeight = 14;
-  const lineEnrollments = getLineEnrollments(enrollments);
-  const goalkeeperEnrollments = getGoalkeeperEnrollments(enrollments);
+  const waitlistEnrollments = getWaitlistEnrollments(enrollments);
+  const isWaitlistOnly = type === "waitlist";
+  const isAll = type === "all";
+  const mainEnrollments = isAll
+    ? enrollments.filter((item) => item.status !== "WAITLIST")
+    : enrollments;
+  const lineEnrollments = getLineEnrollments(mainEnrollments);
+  const goalkeeperEnrollments = getGoalkeeperEnrollments(mainEnrollments);
   const goalkeeperSlots = Math.max(
     racha.goalkeeperLimit ?? 0,
     goalkeeperEnrollments.length,
@@ -232,12 +291,39 @@ async function generatePDF(
   });
   y -= 14;
   drawText(
-    `Tipo de lista: ${type === "confirmed" ? "Apenas confirmados" : "Todos os atletas"}`,
+    `Tipo de lista: ${getExportTypeLabel(type)}`,
     margin,
     y,
     { size: 10 },
   );
   y -= 24;
+
+  if (isWaitlistOnly) {
+    drawLine("Lista de espera:", { bold: true, size: 11 });
+
+    if (waitlistEnrollments.length === 0) {
+      drawLine("Nenhum atleta na lista de espera.");
+    } else {
+      for (let index = 0; index < waitlistEnrollments.length; index += 1) {
+        ensureSpace();
+        const enrollment = waitlistEnrollments[index]!;
+        drawLine(
+          `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`,
+        );
+      }
+    }
+
+    const bytes = await pdfDoc.save();
+    const buffer = Buffer.from(bytes);
+
+    return new NextResponse(buffer, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="lista_${racha.slug}_${type}.pdf"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
   drawLine("Lista de atletas:", { bold: true, size: 11 });
   for (let index = 0; index < racha.athleteLimit; index += 1) {
@@ -265,6 +351,20 @@ async function generatePDF(
         enrollment
           ? `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`
           : `${index + 1} - `,
+      );
+    }
+  }
+
+  if (isAll && waitlistEnrollments.length > 0) {
+    y -= 8;
+    ensureSpace(80);
+    drawLine("Lista de espera:", { bold: true, size: 11 });
+
+    for (let index = 0; index < waitlistEnrollments.length; index += 1) {
+      ensureSpace();
+      const enrollment = waitlistEnrollments[index]!;
+      drawLine(
+        `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`,
       );
     }
   }

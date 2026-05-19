@@ -170,7 +170,6 @@ export function EnrollmentManagement({
             <PhoneInput
               name="participantPhone"
               placeholder="99 9 9999-9999"
-              required
             />
           </label>
 

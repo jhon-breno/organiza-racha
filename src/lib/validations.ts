@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ORGANIZER_DEFAULT_PHONE } from "@/lib/constants";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { participantLevelValues } from "@/lib/participant-level";
 import { createDateInAppTimeZone } from "@/lib/utils";
@@ -224,7 +225,13 @@ export const enrollmentSchema = z
 export const organizerEnrollmentSchema = z.object({
   rachaId: z.string().min(1, "Racha inválido."),
   participantName: z.string().min(2, "Informe o nome do participante."),
-  participantPhone: z.string().min(8, "Informe um telefone válido."),
+  participantPhone: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === ""
+        ? ORGANIZER_DEFAULT_PHONE
+        : value,
+    z.string().min(8, "Informe um telefone válido."),
+  ),
   participantPosition: z.string().min(2, "Informe a posição do participante."),
   participantLevel: z.enum(participantLevelValues),
   notes: z

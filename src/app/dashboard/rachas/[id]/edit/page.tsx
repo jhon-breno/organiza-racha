@@ -10,6 +10,7 @@ import { PageActionFeedbackController } from "@/components/page-action-feedback-
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { RachaAdminManagement } from "@/components/racha-admin-management";
 import { RachaForm } from "@/components/racha-form";
+import { WaitlistListModal } from "@/components/waitlist-list-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -120,6 +121,18 @@ export default async function EditRachaPage({
   const waitlistCount = racha.enrollments.filter(
     (item) => item.status === ParticipantStatus.WAITLIST,
   ).length;
+  const waitlistEnrollments = racha.enrollments
+    .filter((item) => item.status === ParticipantStatus.WAITLIST)
+    .map((item) => ({
+      id: item.id,
+      createdAt: item.createdAt,
+      participantName: item.participantName,
+      participantPhone: item.participantPhone,
+      participantPosition: item.participantPosition,
+      participantLevel: item.participantLevel,
+      status: item.status,
+      paymentStatus: item.paymentStatus,
+    }));
   const totalAthletes = racha.enrollments.filter(
     (item) => isVisibleEnrollment(item) && !isGoalkeeperEnrollment(item),
   ).length;
@@ -225,10 +238,22 @@ export default async function EditRachaPage({
           </Card>
 
           <Card>
-            <p className="text-sm text-slate-500">Lista de espera</p>
-            <p className="mt-1 text-2xl font-black text-slate-950">
-              {waitlistCount}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-500">Lista de espera</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">
+                  {waitlistCount}
+                </p>
+              </div>
+              <WaitlistListModal
+                enrollments={waitlistEnrollments}
+                eventDate={racha.eventDate}
+                locationName={racha.locationName}
+                rachaId={racha.id}
+                rachaTitle={racha.title}
+                whatsappGroupUrl={racha.whatsappGroupUrl}
+              />
+            </div>
           </Card>
 
           <Card>

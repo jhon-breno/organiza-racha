@@ -66,12 +66,13 @@ function generateWhatsappMessage(
   locationName: string,
   lineEnrollments: AllAthleteEnrollment[],
   goalkeeperEnrollments: AllAthleteEnrollment[],
+  waitlistEnrollments: AllAthleteEnrollment[],
   athleteLimit: number,
   goalkeeperLimit: number | null | undefined,
   slug: string,
 ): string {
   const dateStr = formatDateTimeShort(eventDate);
-  const inscriptionUrl = `https://organizaracha.com.br/rachas/${slug}`;
+  const inscriptionUrl = `https://organiza-racha.vercel.app/rachas/${slug}`;
 
   let message = `*${rachaTitle}* - Lista completa (${athleteLimit} Vagas)\n`;
   message += `Local: ${locationName}\n`;
@@ -110,6 +111,15 @@ function generateWhatsappMessage(
     }
   }
 
+  if (waitlistEnrollments.length > 0) {
+    message += `\nLista de espera:\n`;
+
+    for (let index = 0; index < waitlistEnrollments.length; index += 1) {
+      const enrollment = waitlistEnrollments[index]!;
+      message += `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+    }
+  }
+
   return message;
 }
 
@@ -134,30 +144,55 @@ export function AllAthletesListModal({
     () => enrollments.filter(isVisibleEnrollment),
     [enrollments],
   );
-  const lineEnrollments = useMemo(
+  const waitlistEnrollments = useMemo(
     () =>
       activeEnrollments
-        .filter((item) => !isGoalkeeperEnrollment(item))
+        .filter((item) => item.status === "WAITLIST")
         .sort(compareEnrollmentsForExport),
     [activeEnrollments],
+  );
+  const mainEnrollments = useMemo(
+    () => activeEnrollments.filter((item) => item.status !== "WAITLIST"),
+    [activeEnrollments],
+  );
+  const lineEnrollments = useMemo(
+    () =>
+      mainEnrollments
+        .filter((item) => !isGoalkeeperEnrollment(item))
+        .sort(compareEnrollmentsForExport),
+    [mainEnrollments],
   );
   const goalkeeperEnrollments = useMemo(
     () =>
-      activeEnrollments
+      mainEnrollments
         .filter(isGoalkeeperEnrollment)
         .sort(compareEnrollmentsForExport),
-    [activeEnrollments],
+    [mainEnrollments],
   );
 
   const subtitle = useMemo(() => {
-    if (lineEnrollments.length === 1 && goalkeeperEnrollments.length === 0) {
+    if (
+      lineEnrollments.length === 1 &&
+      goalkeeperEnrollments.length === 0 &&
+      waitlistEnrollments.length === 0
+    ) {
       return "1 atleta inscrito";
     }
-    if (goalkeeperEnrollments.length === 0) {
+    if (goalkeeperEnrollments.length === 0 && waitlistEnrollments.length === 0) {
       return `${lineEnrollments.length} atletas inscritos`;
     }
-    return `${lineEnrollments.length} atletas inscritos + ${goalkeeperEnrollments.length} goleiro(s)`;
-  }, [goalkeeperEnrollments.length, lineEnrollments.length]);
+    const summary = [`${lineEnrollments.length} atletas inscritos`];
+
+    if (goalkeeperEnrollments.length > 0) {
+      summary.push(`${goalkeeperEnrollments.length} goleiro(s)`);
+    }
+
+    if (waitlistEnrollments.length > 0) {
+      summary.push(`${waitlistEnrollments.length} na espera`);
+    }
+
+    return summary.join(" + ");
+  }, [goalkeeperEnrollments.length, lineEnrollments.length, waitlistEnrollments.length]);
 
   const whatsappMessage = useMemo(
     () =>
@@ -167,6 +202,7 @@ export function AllAthletesListModal({
         locationName,
         lineEnrollments,
         goalkeeperEnrollments,
+        waitlistEnrollments,
         athleteLimit,
         goalkeeperLimit,
         slug,
@@ -180,6 +216,7 @@ export function AllAthletesListModal({
       locationName,
       rachaTitle,
       slug,
+      waitlistEnrollments,
     ],
   );
 
@@ -359,6 +396,39 @@ export function AllAthletesListModal({
                                     <p className="text-xs text-slate-600">
                                       {enrollment.participantPhone} •{" "}
                                       {levelLabels[enrollment.participantLevel]}
+                                    </p>
+                                  </div>
+                                  <Badge className={`ml-3 ${statusColor}`}>
+                                    {status}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {waitlistEnrollments.length > 0 ? (
+                        <div className="pt-2">
+                          <p className="mb-3 text-sm font-semibold text-slate-700">
+                            Lista de espera
+                          </p>
+                          <div className="space-y-3">
+                            {waitlistEnrollments.map((enrollment, index) => {
+                              const status = getEnrollmentStatusLabel(enrollment);
+                              const statusColor = getStatusColor(status);
+
+                              return (
+                                <div
+                                  key={enrollment.id}
+                                  className="flex items-start justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                                >
+                                  <div className="flex-1 space-y-1">
+                                    <p className="text-sm font-bold text-slate-950">
+                                      {index + 1}. {enrollment.participantName}
+                                    </p>
+                                    <p className="text-xs text-slate-600">
+                                      {enrollment.participantPhone} • {enrollment.participantPosition} • {levelLabels[enrollment.participantLevel]}
                                     </p>
                                   </div>
                                   <Badge className={`ml-3 ${statusColor}`}>

@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured, signIn, signOut } from "@/auth";
+import { ORGANIZER_DEFAULT_PHONE } from "@/lib/constants";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { participantLevelValues } from "@/lib/participant-level";
 import { prisma } from "@/lib/prisma";
@@ -70,6 +71,10 @@ function normalizePhoneValue(phone: string) {
       : rawDigits.slice(0, 11);
 
   return digits || phone.trim().toLowerCase();
+}
+
+function isOrganizerDefaultPhone(phone: string) {
+  return normalizePhoneValue(phone) === ORGANIZER_DEFAULT_PHONE;
 }
 
 function normalizeEmailValue(email: string) {
@@ -295,11 +300,16 @@ async function createOrganizerEnrollmentForRacha(input: {
   const isGoalkeeperEnrollment =
     input.racha.modality === "FUTEBOL" &&
     isGoalkeeperPosition(input.enrollment.participantPosition);
-
-  const duplicatedPhone = await hasDuplicatedPhoneEnrollment(
-    input.racha.id,
+  const usesDefaultPhone = isOrganizerDefaultPhone(
     input.enrollment.participantPhone,
   );
+
+  const duplicatedPhone = usesDefaultPhone
+    ? false
+    : await hasDuplicatedPhoneEnrollment(
+        input.racha.id,
+        input.enrollment.participantPhone,
+      );
 
   if (duplicatedPhone) {
     throw new Error(
@@ -366,13 +376,20 @@ async function createOrganizerEnrollmentForRacha(input: {
     ? PaymentStatus.PAID
     : PaymentStatus.PENDING;
   const nextPixPaid = isGoalkeeperEnrollment;
-  const normalizedPhone = normalizePhoneValue(
-    input.enrollment.participantPhone,
-  );
-  const participantUser = await getOrCreateParticipantUser({
-    name: input.enrollment.participantName,
-    phone: normalizedPhone,
-  });
+  const normalizedPhone = usesDefaultPhone
+    ? ORGANIZER_DEFAULT_PHONE
+    : normalizePhoneValue(input.enrollment.participantPhone);
+  const participantUser = usesDefaultPhone
+    ? await prisma.user.create({
+        data: {
+          name: input.enrollment.participantName,
+        },
+        select: { id: true, name: true },
+      })
+    : await getOrCreateParticipantUser({
+        name: input.enrollment.participantName,
+        phone: normalizedPhone,
+      });
 
   await prisma.enrollment.create({
     data: {

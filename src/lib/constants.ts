@@ -86,6 +86,8 @@ export const recurrenceFrequencyOptions = [
   { value: "MONTHLY", label: "Todo mês" },
 ] as const;
 
+export const ORGANIZER_DEFAULT_PHONE = "99999999999";
+
 export const levelOptions = participantLevelOptions;
 
 export const positionOptionsFutebol = [
