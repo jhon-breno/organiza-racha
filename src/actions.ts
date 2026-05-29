@@ -67,8 +67,7 @@ function buildEnrollmentStatusUpdate(input: {
   const refundedState =
     input.paymentStatus === PaymentStatus.REFUND_REQUESTED ||
     input.paymentStatus === PaymentStatus.REFUNDED;
-  const paidState =
-    input.paymentStatus === PaymentStatus.PAID || refundedState;
+  const paidState = input.paymentStatus === PaymentStatus.PAID || refundedState;
 
   return {
     status: input.status,
@@ -78,9 +77,7 @@ function buildEnrollmentStatusUpdate(input: {
       input.status === ParticipantStatus.CANCELED
         ? (input.canceledAt ?? now)
         : null,
-    refundRequestedAt: refundedState
-      ? (input.refundRequestedAt ?? now)
-      : null,
+    refundRequestedAt: refundedState ? (input.refundRequestedAt ?? now) : null,
   };
 }
 
@@ -975,10 +972,27 @@ export async function updateOrganizerDataSettingsAction(formData: FormData) {
     updateData.nickname = parsed.data.nickname || null;
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: updateData,
-  });
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: updateData,
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      redirect(
+        buildMessageUrl(
+          "/dashboard",
+          "error",
+          "Este número de telefone já está cadastrado em outra conta.",
+          { field: "phone" },
+        ),
+      );
+    }
+    throw error;
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/rachas/new");
@@ -1995,7 +2009,9 @@ export async function updateOrganizerEnrollmentLevelAction(formData: FormData) {
   );
 }
 
-export async function updateOrganizerEnrollmentStatusAction(formData: FormData) {
+export async function updateOrganizerEnrollmentStatusAction(
+  formData: FormData,
+) {
   const user = await requireUser("/dashboard");
 
   const parsed = organizerUpdateEnrollmentStatusSchema.safeParse({
@@ -2113,7 +2129,9 @@ export async function cancelPendingPaymentEnrollmentsAction(
   }
 
   const enrollmentIds = racha.enrollments
-    .filter((enrollment) => !isGoalkeeperPosition(enrollment.participantPosition))
+    .filter(
+      (enrollment) => !isGoalkeeperPosition(enrollment.participantPosition),
+    )
     .map((enrollment) => enrollment.id);
 
   const callbackUrl = `/dashboard/rachas/${racha.id}/edit`;
