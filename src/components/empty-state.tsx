@@ -7,11 +7,13 @@ export function EmptyState({
   description,
   actionHref,
   actionLabel,
+  action,
 }: {
   title: string;
   description: string;
   actionHref?: string;
   actionLabel?: string;
+  action?: React.ReactNode;
 }) {
   return (
     <Card className="flex flex-col items-center justify-center gap-4 py-12 text-center">
@@ -24,11 +26,12 @@ export function EmptyState({
           {description}
         </p>
       </div>
-      {actionHref && actionLabel ? (
-        <Button asChild href={actionHref}>
-          {actionLabel}
-        </Button>
-      ) : null}
+      {action ??
+        (actionHref && actionLabel ? (
+          <Button asChild href={actionHref}>
+            {actionLabel}
+          </Button>
+        ) : null)}
     </Card>
   );
 }

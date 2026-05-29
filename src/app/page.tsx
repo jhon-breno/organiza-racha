@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { EmptyState } from "@/components/empty-state";
 import { FiltersBar } from "@/components/filters-bar";
 import { FlashMessage } from "@/components/flash-message";
+import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
 import { RachaCard } from "@/components/racha-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -96,14 +97,18 @@ export default async function Home({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button
-              asChild
-              href={session?.user ? "/dashboard/rachas/new" : "/auth/signin"}
-              size="lg"
-              variant="secondary"
-            >
-              Criar meu racha
-            </Button>
+            {session?.user ? (
+              <NewRachaTypeDialog
+                variant="secondary"
+                className="h-11 px-6 text-base"
+              >
+                Criar meu racha
+              </NewRachaTypeDialog>
+            ) : (
+              <Button asChild href="/auth/signin" size="lg" variant="secondary">
+                Criar meu racha
+              </Button>
+            )}
             <Button
               asChild
               className="border border-white/20 bg-white/10 text-white hover:bg-white/20"
@@ -189,10 +194,15 @@ export default async function Home({
 
         {rachas.length === 0 ? (
           <EmptyState
-            actionHref={
-              session?.user ? "/dashboard/rachas/new" : "/auth/signin"
+            action={
+              session?.user ? (
+                <NewRachaTypeDialog>Publicar um racha</NewRachaTypeDialog>
+              ) : (
+                <Button asChild href="/auth/signin">
+                  Publicar um racha
+                </Button>
+              )
             }
-            actionLabel="Publicar um racha"
             description="Tente ajustar os filtros ou publique o primeiro racha da plataforma."
             title="Nenhum racha encontrado"
           />

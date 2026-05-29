@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
 import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
+import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -186,9 +187,7 @@ export default async function DashboardPage({
             Controle seus rachas, atletas, PIX e reembolsos.
           </h1>
         </div>
-        <Button asChild href="/dashboard/rachas/new">
-          Novo racha
-        </Button>
+        <NewRachaTypeDialog />
       </div>
 
       <FlashMessage status={params.status} message={params.message} />

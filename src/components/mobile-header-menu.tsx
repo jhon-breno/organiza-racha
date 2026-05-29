@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, PlusCircle, X } from "lucide-react";
 import { signOutAction } from "@/actions";
+import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn, getInitials } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ function DrawerContent({
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [rachaDialogOpen, setRachaDialogOpen] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
 
@@ -118,6 +120,7 @@ function DrawerContent({
 
       {mounted ? (
         <div className="fixed inset-0 z-50">
+          {" "}
           <div
             aria-hidden="true"
             className={cn(
@@ -125,7 +128,6 @@ function DrawerContent({
               open ? "opacity-100" : "opacity-0 backdrop-blur-0",
             )}
           />
-
           <aside
             ref={drawerRef}
             className={cn(
@@ -223,17 +225,20 @@ function DrawerContent({
                   >
                     Painel do organizador
                   </Link>
-                  <Link
+                  <button
                     className={buttonVariants({
                       variant: "outline",
                       className: "justify-start",
                     })}
-                    href="/dashboard/rachas/new"
-                    onClick={closeMenu}
+                    onClick={() => {
+                      closeMenu();
+                      setRachaDialogOpen(true);
+                    }}
+                    type="button"
                   >
                     <PlusCircle className="h-4 w-4" />
                     Novo racha
-                  </Link>
+                  </button>
                 </>
               ) : null}
             </nav>
@@ -250,6 +255,12 @@ function DrawerContent({
           </aside>
         </div>
       ) : null}
+
+      {/* Diálogo renderizado fora do menu para sobreviver ao unmount do aside */}
+      <NewRachaTypeDialog
+        open={rachaDialogOpen}
+        onOpenChange={setRachaDialogOpen}
+      />
     </>
   );
 }

@@ -3,6 +3,7 @@ import { PlusCircle, Trophy } from "lucide-react";
 import { auth } from "@/auth";
 import { signOutAction } from "@/actions";
 import { MobileHeaderMenu } from "@/components/mobile-header-menu";
+import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
 import { Button } from "@/components/ui/button";
 import { getInitials } from "@/lib/utils";
 
@@ -38,10 +39,10 @@ export async function AppHeader() {
               <Button asChild href="/dashboard" variant="ghost">
                 Painel do organizador
               </Button>
-              <Button asChild href="/dashboard/rachas/new" variant="outline">
+              <NewRachaTypeDialog variant="outline">
                 <PlusCircle className="h-4 w-4" />
                 Novo racha
-              </Button>
+              </NewRachaTypeDialog>
               <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-teal-600 text-sm font-bold text-white">
                 {session.user.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
