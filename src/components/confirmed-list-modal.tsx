@@ -7,8 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { ToastContainer } from "@/components/toast-container";
 import { useToast } from "@/hooks/use-toast";
 import { participantStatusLabels, levelLabels } from "@/lib/constants";
-import { isConfirmedEnrollment, isGoalkeeperEnrollment } from "@/lib/enrollment";
-import { formatDateTimeShort } from "@/lib/utils";
+import {
+  isConfirmedEnrollment,
+  isGoalkeeperEnrollment,
+} from "@/lib/enrollment";
+import { formatDateTimeShort, formatPhone } from "@/lib/utils";
 
 type ExportableEnrollment = {
   id: string;
@@ -63,7 +66,10 @@ function generateWhatsappMessage(
     }
   }
 
-  const goalkeeperSlots = Math.max(goalkeeperLimit ?? 0, goalkeeperEnrollments.length);
+  const goalkeeperSlots = Math.max(
+    goalkeeperLimit ?? 0,
+    goalkeeperEnrollments.length,
+  );
 
   if (goalkeeperSlots > 0) {
     message += `\nGoleiros:\n`;
@@ -258,7 +264,8 @@ export function ConfirmedListModal({
             ) : (
               <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
                 <div className="space-y-3">
-                  {lineEnrollments.length === 0 && goalkeeperEnrollments.length === 0 ? (
+                  {lineEnrollments.length === 0 &&
+                  goalkeeperEnrollments.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
                       Não há participantes confirmados neste racha.
                     </div>
@@ -274,7 +281,7 @@ export function ConfirmedListModal({
                               {index + 1}. {enrollment.participantName}
                             </p>
                             <p className="text-xs text-slate-600">
-                              {enrollment.participantPhone} •{" "}
+                              {formatPhone(enrollment.participantPhone)} •{" "}
                               {enrollment.participantPosition} •{" "}
                               {levelLabels[enrollment.participantLevel]}
                             </p>
@@ -301,7 +308,7 @@ export function ConfirmedListModal({
                                     {index + 1}. {enrollment.participantName}
                                   </p>
                                   <p className="text-xs text-slate-600">
-                                    {enrollment.participantPhone} •{" "}
+                                    {formatPhone(enrollment.participantPhone)} •{" "}
                                     {levelLabels[enrollment.participantLevel]}
                                   </p>
                                 </div>

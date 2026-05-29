@@ -14,7 +14,7 @@ import {
   isGoalkeeperEnrollment,
   isVisibleEnrollment,
 } from "@/lib/enrollment";
-import { formatDateTimeShort } from "@/lib/utils";
+import { formatDateTimeShort, formatPhone } from "@/lib/utils";
 
 type AllAthleteEnrollment = {
   id: string;
@@ -178,7 +178,10 @@ export function AllAthletesListModal({
     ) {
       return "1 atleta inscrito";
     }
-    if (goalkeeperEnrollments.length === 0 && waitlistEnrollments.length === 0) {
+    if (
+      goalkeeperEnrollments.length === 0 &&
+      waitlistEnrollments.length === 0
+    ) {
       return `${lineEnrollments.length} atletas inscritos`;
     }
     const summary = [`${lineEnrollments.length} atletas inscritos`];
@@ -192,7 +195,11 @@ export function AllAthletesListModal({
     }
 
     return summary.join(" + ");
-  }, [goalkeeperEnrollments.length, lineEnrollments.length, waitlistEnrollments.length]);
+  }, [
+    goalkeeperEnrollments.length,
+    lineEnrollments.length,
+    waitlistEnrollments.length,
+  ]);
 
   const whatsappMessage = useMemo(
     () =>
@@ -342,7 +349,8 @@ export function AllAthletesListModal({
             ) : (
               <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-5">
                 <div className="space-y-2">
-                  {lineEnrollments.length === 0 && goalkeeperEnrollments.length === 0 ? (
+                  {lineEnrollments.length === 0 &&
+                  goalkeeperEnrollments.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
                       Não há atletas inscritos neste racha.
                     </div>
@@ -362,7 +370,7 @@ export function AllAthletesListModal({
                                 {index + 1}. {enrollment.participantName}
                               </p>
                               <p className="text-xs text-slate-600">
-                                {enrollment.participantPhone} •{" "}
+                                {formatPhone(enrollment.participantPhone)} •{" "}
                                 {enrollment.participantPosition} •{" "}
                                 {levelLabels[enrollment.participantLevel]}
                               </p>
@@ -381,7 +389,8 @@ export function AllAthletesListModal({
                           </p>
                           <div className="space-y-3">
                             {goalkeeperEnrollments.map((enrollment, index) => {
-                              const status = getEnrollmentStatusLabel(enrollment);
+                              const status =
+                                getEnrollmentStatusLabel(enrollment);
                               const statusColor = getStatusColor(status);
 
                               return (
@@ -415,7 +424,8 @@ export function AllAthletesListModal({
                           </p>
                           <div className="space-y-3">
                             {waitlistEnrollments.map((enrollment, index) => {
-                              const status = getEnrollmentStatusLabel(enrollment);
+                              const status =
+                                getEnrollmentStatusLabel(enrollment);
                               const statusColor = getStatusColor(status);
 
                               return (
@@ -428,7 +438,9 @@ export function AllAthletesListModal({
                                       {index + 1}. {enrollment.participantName}
                                     </p>
                                     <p className="text-xs text-slate-600">
-                                      {enrollment.participantPhone} • {enrollment.participantPosition} • {levelLabels[enrollment.participantLevel]}
+                                      {formatPhone(enrollment.participantPhone)}{" "}
+                                      • {enrollment.participantPosition} •{" "}
+                                      {levelLabels[enrollment.participantLevel]}
                                     </p>
                                   </div>
                                   <Badge className={`ml-3 ${statusColor}`}>

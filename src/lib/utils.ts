@@ -79,9 +79,7 @@ export function createDateInAppTimeZone(date: string, time: string) {
   const [year, month, day] = date.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);
 
-  if (
-    [year, month, day, hour, minute].some((value) => Number.isNaN(value))
-  ) {
+  if ([year, month, day, hour, minute].some((value) => Number.isNaN(value))) {
     throw new Error("Data ou horário inválido.");
   }
 
@@ -135,6 +133,24 @@ export function formatPhoneInput(value?: string | null) {
   }
 
   return `${digits.slice(0, 2)} ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
+export function formatPhone(value?: string | null) {
+  const rawDigits = (value ?? "").replace(/\D/g, "");
+  const digits =
+    rawDigits.length > 11 && rawDigits.startsWith("55")
+      ? rawDigits.slice(2, 13)
+      : rawDigits.slice(0, 11);
+
+  if (digits.length < 10) return value ?? "";
+
+  if (digits.length === 10) {
+    // Fixo: (99) 9999-9999
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+
+  // Celular: (99) 9 9999-9999
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
 }
 
 export function formatCurrencyFromCents(value: number) {

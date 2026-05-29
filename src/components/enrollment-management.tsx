@@ -31,7 +31,7 @@ import {
   isConfirmedEnrollment,
   isGoalkeeperEnrollment,
 } from "@/lib/enrollment";
-import { formatDateTimeShort } from "@/lib/utils";
+import { formatDateTimeShort, formatPhone } from "@/lib/utils";
 
 const participantStatusOptions = [
   { value: "ACTIVE", label: "Ativa" },
@@ -183,10 +183,7 @@ export function EnrollmentManagement({
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Telefone
-            <PhoneInput
-              name="participantPhone"
-              placeholder="99 9 9999-9999"
-            />
+            <PhoneInput name="participantPhone" placeholder="99 9 9999-9999" />
           </label>
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
@@ -334,7 +331,7 @@ export function EnrollmentManagement({
                     {enrollment.participantName}
                   </h3>
                   <p className="text-sm text-slate-600">
-                    {enrollment.participantPhone} •{" "}
+                    {formatPhone(enrollment.participantPhone)} •{" "}
                     {enrollment.participantPosition} •{" "}
                     {levelLabels[enrollment.participantLevel] ??
                       enrollment.participantLevel}
@@ -389,7 +386,11 @@ export function EnrollmentManagement({
                     type="hidden"
                     value={enrollment.id}
                   />
-                  <Select className="min-w-40" defaultValue={enrollment.status} name="status">
+                  <Select
+                    className="min-w-40"
+                    defaultValue={enrollment.status}
+                    name="status"
+                  >
                     {participantStatusOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}

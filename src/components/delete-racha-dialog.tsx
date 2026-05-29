@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { deleteRachaAction } from "@/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { formatPhone } from "@/lib/utils";
 
 type DeleteRachaDialogProps = {
   rachaId: string;
@@ -162,7 +163,7 @@ export function DeleteRachaDialog({
                             {getUnifiedEnrollmentStatus(enrollment)}
                           </td>
                           <td className="px-3 py-2">
-                            {enrollment.participantPhone}
+                            {formatPhone(enrollment.participantPhone)}
                           </td>
                           <td className="px-3 py-2">
                             {getParticipantPixKey(enrollment.notes)}

@@ -11,7 +11,7 @@ import {
   compareEnrollmentsForExport,
   getEnrollmentStatusLabel,
 } from "@/lib/enrollment";
-import { formatDateTimeShort } from "@/lib/utils";
+import { formatDateTimeShort, formatPhone } from "@/lib/utils";
 
 type WaitlistEnrollment = {
   id: string;
@@ -116,7 +116,12 @@ export function WaitlistListModal({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} size="sm" type="button" variant="outline">
+      <Button
+        onClick={() => setOpen(true)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
         <Download className="h-4 w-4" />
         Exportar espera
       </Button>
@@ -158,13 +163,22 @@ export function WaitlistListModal({
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <Button className="flex-1" onClick={handleCopyWhatsapp} type="button">
+                  <Button
+                    className="flex-1"
+                    onClick={handleCopyWhatsapp}
+                    type="button"
+                  >
                     <Copy className="h-4 w-4" />
                     Copiar mensagem
                   </Button>
 
                   {whatsappGroupUrl ? (
-                    <Button asChild className="flex-1" rel="noopener noreferrer" target="_blank">
+                    <Button
+                      asChild
+                      className="flex-1"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
                       <a href={whatsappGroupUrl}>
                         <MessageCircle className="h-4 w-4" />
                         Enviar para grupo
@@ -172,7 +186,11 @@ export function WaitlistListModal({
                     </Button>
                   ) : null}
 
-                  <Button onClick={() => setExportFormat(null)} type="button" variant="outline">
+                  <Button
+                    onClick={() => setExportFormat(null)}
+                    type="button"
+                    variant="outline"
+                  >
                     Voltar
                   </Button>
                 </div>
@@ -195,7 +213,9 @@ export function WaitlistListModal({
                             {index + 1}. {enrollment.participantName}
                           </p>
                           <p className="text-xs text-slate-600">
-                            {enrollment.participantPhone} • {enrollment.participantPosition} • {levelLabels[enrollment.participantLevel]}
+                            {formatPhone(enrollment.participantPhone)} •{" "}
+                            {enrollment.participantPosition} •{" "}
+                            {levelLabels[enrollment.participantLevel]}
                           </p>
                         </div>
                         <Badge className="ml-3 bg-slate-100 text-slate-700">
@@ -211,15 +231,26 @@ export function WaitlistListModal({
                     Exportar como:
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => setExportFormat("whatsapp")} type="button">
+                    <Button
+                      onClick={() => setExportFormat("whatsapp")}
+                      type="button"
+                    >
                       <MessageCircle className="h-4 w-4" />
                       WhatsApp
                     </Button>
-                    <Button onClick={() => handleExport("pdf")} type="button" variant="outline">
+                    <Button
+                      onClick={() => handleExport("pdf")}
+                      type="button"
+                      variant="outline"
+                    >
                       <Download className="h-4 w-4" />
                       PDF
                     </Button>
-                    <Button onClick={() => handleExport("excel")} type="button" variant="outline">
+                    <Button
+                      onClick={() => handleExport("excel")}
+                      type="button"
+                      variant="outline"
+                    >
                       <Download className="h-4 w-4" />
                       Excel
                     </Button>
@@ -227,7 +258,12 @@ export function WaitlistListModal({
                 </div>
 
                 <div>
-                  <Button className="w-full" onClick={() => setOpen(false)} type="button" variant="outline">
+                  <Button
+                    className="w-full"
+                    onClick={() => setOpen(false)}
+                    type="button"
+                    variant="outline"
+                  >
                     Fechar
                   </Button>
                 </div>

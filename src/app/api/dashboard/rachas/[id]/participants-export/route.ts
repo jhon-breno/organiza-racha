@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { formatPhone } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -170,7 +171,7 @@ export async function GET(
       ensureSpace();
       drawLine(`${index + 1}. ${row.name}`, true);
       drawLine(`Status: ${row.status}`);
-      drawLine(`Telefone: ${row.phone}`);
+      drawLine(`Telefone: ${formatPhone(row.phone)}`);
       drawLine(`Chave PIX: ${row.pixKey}`);
       y -= 6;
     });

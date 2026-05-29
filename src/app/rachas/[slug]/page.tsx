@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import {
   formatCurrencyFromCents,
   formatDateTime,
+  formatPhone,
   getPrivateRachaAccessCookieName,
   getRachaCoverImageUrl,
   getInitials,
@@ -368,7 +369,7 @@ export default async function RachaDetailsPage({
                         </p>
                         <p className="text-sm text-slate-600">
                           {participant.participantPosition} •{" "}
-                          {participant.participantPhone}
+                          {formatPhone(participant.participantPhone)}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">

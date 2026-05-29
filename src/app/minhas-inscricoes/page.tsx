@@ -6,7 +6,11 @@ import { MyEnrollmentActions } from "@/components/my-enrollment-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
-import { formatCurrencyFromCents, formatDateTimeShort } from "@/lib/utils";
+import {
+  formatCurrencyFromCents,
+  formatDateTimeShort,
+  formatPhone,
+} from "@/lib/utils";
 
 type SearchParams = Promise<{
   status?: string;
@@ -130,7 +134,7 @@ export default async function MyEnrollmentsPage({
 
                 <div className="grid gap-3 text-sm text-slate-600 md:grid-cols-2">
                   <p>Posição: {enrollment.participantPosition}</p>
-                  <p>Telefone: {enrollment.participantPhone}</p>
+                  <p>Telefone: {formatPhone(enrollment.participantPhone)}</p>
                   <p>
                     Prazo de desistência: {deadline.toLocaleString("pt-BR")}
                   </p>

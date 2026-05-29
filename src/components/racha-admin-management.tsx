@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { addRachaAdminAction, removeRachaAdminAction } from "@/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { Card } from "@/components/ui/card";
+import { formatPhone } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 type AdminCandidate = {
@@ -193,7 +194,7 @@ export function RachaAdminManagement({
           </p>
           <p className="text-sm text-slate-600">
             {organizer.name || "Sem nome"}
-            {organizer.phone ? ` • ${organizer.phone}` : ""}
+            {organizer.phone ? ` • ${formatPhone(organizer.phone)}` : ""}
             {organizer.email ? ` • ${organizer.email}` : ""}
           </p>
         </div>

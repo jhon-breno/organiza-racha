@@ -7,6 +7,7 @@ import {
   removeOrganizerPendingEnrollmentAction,
 } from "@/actions";
 import { Badge } from "@/components/ui/badge";
+import { formatPhone } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { paymentStatusLabels } from "@/lib/constants";
 
@@ -170,7 +171,7 @@ export function PendingPaymentsModal({
                         </Badge>
                       </div>
                       <p className="text-sm text-slate-600">
-                        {enrollment.participantPhone}
+                        {formatPhone(enrollment.participantPhone)}
                       </p>
                     </div>
 
