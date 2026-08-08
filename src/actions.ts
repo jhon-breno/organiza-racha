@@ -1799,6 +1799,47 @@ export async function joinRachaAction(formData: FormData) {
   );
 }
 
+export async function searchUsersByPhoneAction(query: string) {
+  const user = await requireUser("/dashboard");
+  if (!user) return [];
+
+  const rawQuery = query.trim();
+  if (!rawQuery || rawQuery.length < 2) {
+    return [];
+  }
+
+  const digits = rawQuery.replace(/\D/g, "");
+
+  const ORConditions: Prisma.UserWhereInput[] = [
+    { name: { contains: rawQuery, mode: "insensitive" } },
+  ];
+
+  if (digits.length >= 2) {
+    ORConditions.push({ phone: { contains: digits } });
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      OR: ORConditions,
+    },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+    },
+    take: 10,
+    orderBy: {
+      name: "asc",
+    },
+  });
+
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name || "Sem nome",
+    phone: u.phone || "",
+  }));
+}
+
 export async function addOrganizerEnrollmentAction(formData: FormData) {
   const user = await requireUser("/dashboard");
   const rachaId = getStringValue(formData, "rachaId");

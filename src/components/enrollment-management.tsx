@@ -12,6 +12,7 @@ import {
   updateOrganizerEnrollmentLevelAction,
   updateOrganizerEnrollmentStatusAction,
 } from "@/actions";
+import { AddAthleteModal } from "@/components/add-athlete-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -148,86 +149,30 @@ export function EnrollmentManagement({
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-950">
-              Incluir participante manualmente
+              Incluir participantes
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Adicione atletas no racha com os mesmos dados do formulário de
-              inscrição.
+              Adicione atletas individualmente ou faça importação em massa.
             </p>
           </div>
 
-          <Button
-            onClick={() => setShowBulkImport((current) => !current)}
-            size="sm"
-            type="button"
-            variant={showBulkImport ? "secondary" : "outline"}
-          >
-            {showBulkImport
-              ? "Fechar importacao em massa"
-              : "Subir atletas massivamente"}
-          </Button>
-        </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <AddAthleteModal modality={modality} rachaId={rachaId} />
 
-        <form
-          action={addOrganizerEnrollmentAction}
-          className="grid gap-4 md:grid-cols-2"
-        >
-          <input name="rachaId" type="hidden" value={rachaId} />
-
-          <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
-            Nome
-            <Input
-              name="participantName"
-              placeholder="Nome completo do participante"
-              required
-            />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Telefone
-            <PhoneInput name="participantPhone" placeholder="99 9 9999-9999" />
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Posição
-            <Select defaultValue="Versátil" name="participantPosition">
-              {availablePositions.map((position) => (
-                <option key={position} value={position}>
-                  {position}
-                </option>
-              ))}
-            </Select>
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Nível
-            <Select defaultValue="STAR_3" name="participantLevel">
-              {levelOptions.map((level) => (
-                <option key={level.value} value={level.value}>
-                  {level.visual} {level.label}
-                </option>
-              ))}
-            </Select>
-          </label>
-
-          <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
-            Observação (opcional)
-            <textarea
-              className="flex min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-              name="notes"
-              placeholder="Ex.: chega 10 min antes, joga melhor na direita..."
-            />
-          </label>
-
-          <div className="md:col-span-2">
-            <SubmitButton pendingLabel="Incluindo..." size="sm">
-              Incluir participante
-            </SubmitButton>
+            <Button
+              onClick={() => setShowBulkImport((current) => !current)}
+              type="button"
+              variant={showBulkImport ? "secondary" : "outline"}
+            >
+              {showBulkImport
+                ? "Fechar importação em massa"
+                : "Subir atletas massivamente"}
+            </Button>
           </div>
-        </form>
+        </div>
       </Card>
 
       {showBulkImport ? (
