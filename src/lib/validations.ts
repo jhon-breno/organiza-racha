@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { ORGANIZER_DEFAULT_PHONE } from "@/lib/constants";
-import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { participantLevelValues } from "@/lib/participant-level";
 import { createDateInAppTimeZone } from "@/lib/utils";
 
@@ -133,20 +132,8 @@ export const rachaFormSchema = z
       });
     }
 
-    if (hasPaymentDeadlineDate !== hasPaymentDeadlineTime) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["paymentDeadlineDate"],
-        message: "Informe data e horário do prazo de pagamento.",
-      });
-      return;
-    }
-
-    if (hasPaymentDeadlineDate && hasPaymentDeadlineTime) {
-      const paymentDeadlineDate = data.paymentDeadlineDate;
-      const paymentDeadlineTime = data.paymentDeadlineTime;
-
-      if (!paymentDeadlineDate || !paymentDeadlineTime) {
+    if (data.price > 0) {
+      if (hasPaymentDeadlineDate !== hasPaymentDeadlineTime) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["paymentDeadlineDate"],
@@ -155,37 +142,51 @@ export const rachaFormSchema = z
         return;
       }
 
-      let paymentDeadline: Date;
+      if (hasPaymentDeadlineDate && hasPaymentDeadlineTime) {
+        const paymentDeadlineDate = data.paymentDeadlineDate;
+        const paymentDeadlineTime = data.paymentDeadlineTime;
 
-      try {
-        paymentDeadline = createDateInAppTimeZone(
-          paymentDeadlineDate,
-          paymentDeadlineTime,
-        );
-      } catch {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["paymentDeadlineDate"],
-          message: "Prazo de pagamento inválido.",
-        });
-        return;
-      }
+        if (!paymentDeadlineDate || !paymentDeadlineTime) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["paymentDeadlineDate"],
+            message: "Informe data e horário do prazo de pagamento.",
+          });
+          return;
+        }
 
-      if (paymentDeadline <= new Date()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["paymentDeadlineDate"],
-          message: "O prazo de pagamento deve estar no futuro.",
-        });
-      }
+        let paymentDeadline: Date;
 
-      if (paymentDeadline >= eventDateTime) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["paymentDeadlineDate"],
-          message:
-            "O prazo de pagamento precisa ser antes da data e horário do racha.",
-        });
+        try {
+          paymentDeadline = createDateInAppTimeZone(
+            paymentDeadlineDate,
+            paymentDeadlineTime,
+          );
+        } catch {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["paymentDeadlineDate"],
+            message: "Prazo de pagamento inválido.",
+          });
+          return;
+        }
+
+        if (paymentDeadline <= new Date()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["paymentDeadlineDate"],
+            message: "O prazo de pagamento deve estar no futuro.",
+          });
+        }
+
+        if (paymentDeadline >= eventDateTime) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["paymentDeadlineDate"],
+            message:
+              "O prazo de pagamento precisa ser antes da data e horário do racha.",
+          });
+        }
       }
     }
   });
@@ -208,18 +209,6 @@ export const enrollmentSchema = z
       .refine((value) => value, "Você deve aceitar as regras."),
     paymentCommitment: z.coerce.boolean().default(false),
     accessKey: z.string().optional().or(z.literal("")),
-  })
-  .superRefine((data, context) => {
-    if (
-      !isGoalkeeperPosition(data.participantPosition) &&
-      !data.paymentCommitment
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["paymentCommitment"],
-        message: "Confirme que só estará na lista após realizar o pagamento.",
-      });
-    }
   });
 
 export const organizerEnrollmentSchema = z.object({

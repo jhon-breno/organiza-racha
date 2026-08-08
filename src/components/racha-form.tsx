@@ -73,6 +73,9 @@ export function RachaForm({
   const [hasFixedSetter, setHasFixedSetter] = useState(
     defaultValues?.hasFixedSetter ?? false,
   );
+  const [isFree, setIsFree] = useState(
+    defaultValues ? defaultValues.priceInCents === 0 : false,
+  );
 
   const isFutebol = modality === "FUTEBOL";
   const isVolei = modality === "VOLEI";
@@ -396,9 +399,53 @@ export function RachaForm({
             Data, horário e valor
           </h3>
           <p className="mt-1 text-sm text-slate-600">
-            Defina quando o racha acontece, quanto custa e qual a janela de
-            desistência.
+            Defina quando o racha acontece, se é gratuito ou pago, e as regras de desistência.
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-sm font-bold text-slate-900">Tipo de Cobrança do Racha</span>
+              <p className="text-xs text-slate-600">Escolha se os participantes pagarão taxa ou se o racha será 100% gratuito.</p>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setIsFree(false)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  !isFree
+                    ? "bg-slate-950 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Cobrar Valor (Pago)
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFree(true)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  isFree
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-emerald-700"
+                }`}
+              >
+                Racha Gratuito (R$ 0,00)
+              </button>
+            </div>
+          </div>
+
+          {isFree ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-950 flex items-start gap-2.5">
+              <span className="mt-0.5 inline-block h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+              <div>
+                <p className="font-bold text-emerald-900">Racha Gratuito Ativado</p>
+                <p className="mt-0.5 leading-relaxed text-emerald-800">
+                  Os atletas não pagarão taxa para participar. Sem cobrança de PIX e sem prazo de pagamento. Ao se inscreverem, entrarão diretamente na lista de confirmados.
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -434,48 +481,77 @@ export function RachaForm({
           <input name="isRecurring" type="hidden" value="false" />
           <input name="recurrenceFrequency" type="hidden" value="" />
 
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Prazo pagamento (data)
-            <Input
-              defaultValue={
-                defaultValues?.paymentDeadline
-                  ? formatDateInput(defaultValues.paymentDeadline)
-                  : ""
-              }
-              min={isEditing ? undefined : minEventDate}
-              name="paymentDeadlineDate"
-              type="date"
-            />
-          </label>
+          {!isFree ? (
+            <>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                Prazo pagamento (data)
+                <Input
+                  defaultValue={
+                    defaultValues?.paymentDeadline
+                      ? formatDateInput(defaultValues.paymentDeadline)
+                      : ""
+                  }
+                  min={isEditing ? undefined : minEventDate}
+                  name="paymentDeadlineDate"
+                  type="date"
+                />
+              </label>
 
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Prazo pagamento (hora)
-            <Input
-              defaultValue={
-                defaultValues?.paymentDeadline
-                  ? formatTimeInput(defaultValues.paymentDeadline)
-                  : ""
-              }
-              name="paymentDeadlineTime"
-              type="time"
-            />
-          </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                Prazo pagamento (hora)
+                <Input
+                  defaultValue={
+                    defaultValues?.paymentDeadline
+                      ? formatTimeInput(defaultValues.paymentDeadline)
+                      : ""
+                  }
+                  name="paymentDeadlineTime"
+                  type="time"
+                />
+              </label>
 
-          <label className="space-y-2 text-sm font-medium text-slate-700">
-            Valor por atleta (R$)
-            <Input
-              defaultValue={
-                defaultValues?.priceInCents
-                  ? defaultValues.priceInCents / 100
-                  : 0
-              }
-              min={0}
-              name="price"
-              step="0.01"
-              type="number"
-              required
-            />
-          </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                Valor por atleta (R$)
+                <Input
+                  defaultValue={
+                    defaultValues?.priceInCents
+                      ? defaultValues.priceInCents / 100
+                      : 10
+                  }
+                  min={0}
+                  name="price"
+                  step="0.01"
+                  type="number"
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val) && val === 0) {
+                      setIsFree(true);
+                    }
+                  }}
+                  required
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <input name="paymentDeadlineDate" type="hidden" value="" />
+              <input name="paymentDeadlineTime" type="hidden" value="" />
+              <input name="price" type="hidden" value="0" />
+              <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800 lg:col-span-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-emerald-950">Isento de cobrança</p>
+                  <p className="mt-0.5">Valor definido como R$ 0,00 (Gratuito)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFree(false)}
+                  className="text-xs font-semibold underline text-emerald-700 hover:text-emerald-900"
+                >
+                  Alterar para Pago
+                </button>
+              </div>
+            </>
+          )}
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Prazo de desistência (h)

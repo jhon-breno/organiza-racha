@@ -37,6 +37,7 @@ export function JoinRachaForm({
     visibility: "OPEN" | "PRIVATE";
     phoneWhatsapp: string;
     rules: string;
+    priceInCents?: number;
     goalkeeperLimit?: number | null;
     setterLimit?: number | null;
     hasFixedSetter?: boolean;
@@ -52,6 +53,7 @@ export function JoinRachaForm({
       success: false,
     });
 
+  const isFree = racha.priceInCents === 0;
   const isPrivateRacha = racha.visibility === "PRIVATE";
   const isKeyStepConfirmed =
     !isPrivateRacha || privateAccessGranted || keyValidationState.success;
@@ -114,9 +116,11 @@ export function JoinRachaForm({
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {isPrivateRacha
             ? "Racha privado: confirme a chave secreta para liberar o formulário de inscrição."
-            : isGoalkeeperSelection
-              ? "Informe seus dados e finalize a inscrição. Goleiro entra confirmado automaticamente e não paga taxa."
-              : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições com QR Code PIX."}
+            : isFree
+              ? "Informe seus dados e aceite as regras. Como este racha é gratuito, sua vaga é confirmada imediatamente!"
+              : isGoalkeeperSelection
+                ? "Informe seus dados e finalize a inscrição. Goleiro entra confirmado automaticamente e não paga taxa."
+                : "Informe seus dados e aceite as regras. Após a inscrição, o pagamento é feito pela sua área de inscrições com QR Code PIX."}
         </p>
       </div>
 
@@ -158,7 +162,12 @@ export function JoinRachaForm({
         </form>
       ) : null}
 
-      {isKeyStepConfirmed && isGoalkeeperSelection ? (
+      {isKeyStepConfirmed && isFree ? (
+        <div className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-semibold">Racha 100% Gratuito</p>
+          <p className="mt-1">Inscrição sem custo. Sua vaga será confirmada assim que enviar este formulário.</p>
+        </div>
+      ) : isKeyStepConfirmed && isGoalkeeperSelection ? (
         <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           <p className="font-semibold">Inscrição de goleiro sem taxa</p>
           <p className="mt-1">Goleiro entra confirmado automaticamente e não precisa enviar PIX.</p>
@@ -234,7 +243,7 @@ export function JoinRachaForm({
             />
           </label>
 
-          {!isGoalkeeperSelection ? (
+          {!isFree && !isGoalkeeperSelection ? (
             <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <input
                 className="mt-1 h-4 w-4 rounded border-slate-300"

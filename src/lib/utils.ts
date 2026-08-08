@@ -154,6 +154,10 @@ export function formatPhone(value?: string | null) {
 }
 
 export function formatCurrencyFromCents(value: number) {
+  if (value === 0) {
+    return "Gratuito";
+  }
+
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",

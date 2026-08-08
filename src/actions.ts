@@ -312,6 +312,7 @@ async function createOrganizerEnrollmentForRacha(input: {
     organizerId: string;
     eventDate: Date;
     athleteLimit: number;
+    priceInCents: number;
     goalkeeperLimit: number | null;
     hasFixedSetter: boolean;
     setterLimit: number | null;
@@ -395,14 +396,16 @@ async function createOrganizerEnrollmentForRacha(input: {
     },
   });
 
+  const isFree = input.racha.priceInCents === 0;
   const nextStatus =
     !isGoalkeeperEnrollment && confirmedCount >= input.racha.athleteLimit
       ? ParticipantStatus.WAITLIST
       : ParticipantStatus.ACTIVE;
-  const nextPaymentStatus = isGoalkeeperEnrollment
-    ? PaymentStatus.PAID
-    : PaymentStatus.PENDING;
-  const nextPixPaid = isGoalkeeperEnrollment;
+  const nextPaymentStatus =
+    isFree || isGoalkeeperEnrollment
+      ? PaymentStatus.PAID
+      : PaymentStatus.PENDING;
+  const nextPixPaid = isFree || isGoalkeeperEnrollment;
   const normalizedPhone = usesDefaultPhone
     ? ORGANIZER_DEFAULT_PHONE
     : normalizePhoneValue(input.enrollment.participantPhone);
@@ -1201,8 +1204,9 @@ export async function createRachaAction(formData: FormData) {
     parsed.data.eventDate,
     parsed.data.eventTime,
   );
+  const isFree = parsed.data.price === 0;
   const paymentDeadline =
-    parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
+    !isFree && parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
       ? combineDateAndTime(
           parsed.data.paymentDeadlineDate,
           parsed.data.paymentDeadlineTime,
@@ -1263,11 +1267,12 @@ export async function createRachaAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/dashboard");
 
+  const isPublished = isFree || hasPixConfiguration(pixKey);
   redirect(
     buildMessageUrl(
       "/dashboard",
       "success",
-      hasPixConfiguration(pixKey)
+      isPublished
         ? "Racha criado com sucesso."
         : "Racha criado com sucesso. Configure a chave PIX para publicar e liberar inscricoes.",
     ),
@@ -1343,8 +1348,9 @@ export async function updateRachaAction(formData: FormData) {
     parsed.data.eventDate,
     parsed.data.eventTime,
   );
+  const isFree = parsed.data.price === 0;
   const paymentDeadline =
-    parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
+    !isFree && parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
       ? combineDateAndTime(
           parsed.data.paymentDeadlineDate,
           parsed.data.paymentDeadlineTime,
@@ -1402,16 +1408,30 @@ export async function updateRachaAction(formData: FormData) {
     },
   });
 
+  if (isFree) {
+    await prisma.enrollment.updateMany({
+      where: {
+        rachaId: id,
+        paymentStatus: PaymentStatus.PENDING,
+      },
+      data: {
+        paymentStatus: PaymentStatus.PAID,
+        pixPaid: true,
+      },
+    });
+  }
+
   revalidatePath("/");
   revalidatePath("/dashboard");
   revalidatePath(`/rachas/${slug}`);
   revalidatePath(`/dashboard/rachas/${id}/edit`);
 
+  const isPublished = isFree || hasPixConfiguration(pixKey);
   redirect(
     buildMessageUrl(
       `/dashboard/rachas/${id}/edit`,
       "success",
-      hasPixConfiguration(pixKey)
+      isPublished
         ? "Racha atualizado com sucesso."
         : "Racha atualizado com sucesso. Configure a chave PIX para publicar e liberar inscricoes.",
     ),
@@ -1491,7 +1511,9 @@ export async function joinRachaAction(formData: FormData) {
     redirect(buildMessageUrl("/", "error", "Racha não encontrado."));
   }
 
-  if (!hasPixConfiguration(racha.pixKey)) {
+  const isFree = racha.priceInCents === 0;
+
+  if (!isFree && !hasPixConfiguration(racha.pixKey)) {
     redirect(
       buildMessageUrl(
         callbackUrl,
@@ -1501,7 +1523,7 @@ export async function joinRachaAction(formData: FormData) {
     );
   }
 
-  if (racha.paymentDeadline && new Date() > racha.paymentDeadline) {
+  if (!isFree && racha.paymentDeadline && new Date() > racha.paymentDeadline) {
     await prisma.enrollment.updateMany({
       where: {
         rachaId,
@@ -1553,6 +1575,17 @@ export async function joinRachaAction(formData: FormData) {
   const isGoalkeeperEnrollment =
     racha.modality === "FUTEBOL" &&
     isGoalkeeperPosition(parsed.data.participantPosition);
+
+  if (!isFree && !isGoalkeeperEnrollment && !parsed.data.paymentCommitment) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Confirme que só estará na lista após realizar o pagamento.",
+      ),
+    );
+  }
+
   const normalizedPhone = normalizePhoneValue(parsed.data.participantPhone);
 
   // Validação de vagas por posição específica
@@ -1702,10 +1735,11 @@ export async function joinRachaAction(formData: FormData) {
     !isGoalkeeperEnrollment && confirmedCount >= racha.athleteLimit
       ? ParticipantStatus.WAITLIST
       : ParticipantStatus.ACTIVE;
-  const nextPaymentStatus = isGoalkeeperEnrollment
-    ? PaymentStatus.PAID
-    : PaymentStatus.PENDING;
-  const nextPixPaid = isGoalkeeperEnrollment;
+  const nextPaymentStatus =
+    isFree || isGoalkeeperEnrollment
+      ? PaymentStatus.PAID
+      : PaymentStatus.PENDING;
+  const nextPixPaid = isFree || isGoalkeeperEnrollment;
 
   if (existing) {
     await prisma.enrollment.update({

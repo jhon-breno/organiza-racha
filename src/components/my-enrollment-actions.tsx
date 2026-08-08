@@ -55,13 +55,14 @@ export function MyEnrollmentActions({
     null,
   );
 
+  const isFree = priceInCents === 0;
   const isGoalkeeper = isGoalkeeperPosition(participantPosition);
   const canPay =
-    !isGoalkeeper && paymentStatus === "PENDING" && enrollmentStatus !== "CANCELED";
+    !isFree && !isGoalkeeper && paymentStatus === "PENDING" && enrollmentStatus !== "CANCELED";
   const canCancelPending =
-    enrollmentStatus !== "CANCELED" && (isGoalkeeper || paymentStatus === "PENDING");
+    enrollmentStatus !== "CANCELED" && (isFree || isGoalkeeper || paymentStatus === "PENDING");
   const canRequestRefund =
-    !isGoalkeeper && paymentStatus === "PAID" && enrollmentStatus !== "CANCELED";
+    !isFree && !isGoalkeeper && paymentStatus === "PAID" && enrollmentStatus !== "CANCELED";
   const pixPayload = useMemo(
     () =>
       buildPixPaymentPayload({

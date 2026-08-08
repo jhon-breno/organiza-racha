@@ -103,7 +103,8 @@ export default async function RachaDetailsPage({
     racha.profileImageUrl?.trim() || racha.organizer.image?.trim() || null;
   const organizerDisplayName =
     racha.organizerDisplayName || racha.organizer.name || "Organizador";
-  const isPublishedForEnrollment = Boolean(racha.pixKey.trim());
+  const isPublishedForEnrollment =
+    Boolean(racha.pixKey.trim()) || racha.priceInCents === 0;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
