@@ -14,6 +14,7 @@ import { PageActionFeedbackController } from "@/components/page-action-feedback-
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
 import { AddUserDialog } from "@/components/add-user-dialog";
+import { DashboardRachaList } from "@/components/dashboard-racha-list";
 import { ShareRachaButton } from "@/components/share-racha-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,7 +145,7 @@ export default async function DashboardPage({
     include: {
       enrollments: true,
     },
-    orderBy: [{ eventDate: "asc" }],
+    orderBy: [{ eventDate: "desc" }],
   });
 
   const confirmedParticipants = rachas.reduce(
@@ -328,193 +329,11 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      {rachas.length === 0 ? (
-        <EmptyState
-          actionHref="/dashboard/rachas/new"
-          actionLabel="Criar primeiro racha"
-          description="Você ainda não publicou nenhum racha. Comece criando um evento completo com mapa, PIX e regras."
-          title="Seu painel ainda está vazio"
-        />
-      ) : (
-        <div className="grid gap-6">
-          {rachas.map((racha) => {
-            const isInvitedAdmin =
-              racha.organizerId !== session.user.id &&
-              adminRachaIdSet.has(racha.id);
-            const confirmedEnrollments = racha.enrollments.filter((item) =>
-              isConfirmedEnrollment(item, racha.priceInCents),
-            );
-            const confirmed = confirmedEnrollments.filter(
-              (item) => !isGoalkeeperEnrollment(item),
-            ).length;
-            const awaitingPayment = racha.enrollments.filter((item) =>
-              isAwaitingPaymentEnrollment(item, racha.priceInCents),
-            ).length;
-            const waitlist = racha.enrollments.filter(
-              (item) => item.status === ParticipantStatus.WAITLIST,
-            ).length;
-            const pendingEnrollments = racha.enrollments
-              .filter((item) =>
-                isAwaitingPaymentEnrollment(item, racha.priceInCents),
-              )
-              .map((item) => ({
-                id: item.id,
-                participantName: item.participantName,
-                participantPhone: item.participantPhone,
-                paymentStatus: item.paymentStatus,
-              }));
-            const totalAthletes = racha.enrollments.filter(
-              (item) =>
-                isVisibleEnrollment(item) && !isGoalkeeperEnrollment(item),
-            ).length;
-
-            return (
-              <Card key={racha.id} className="space-y-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge>
-                        {modalityLabels[racha.modality] ?? racha.modality}
-                      </Badge>
-                      <Badge className="bg-slate-100 text-slate-700">
-                        {racha.visibility === "PRIVATE" ? "Privado" : "Aberto"}
-                      </Badge>
-                      {isInvitedAdmin ? (
-                        <Badge className="bg-teal-100 text-teal-800">
-                          Admin convidado
-                        </Badge>
-                      ) : null}
-                      {!racha.pixKey.trim() ? (
-                        <Badge className="bg-amber-100 text-amber-800">
-                          Aguardando PIX
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <h2 className="text-2xl font-bold text-slate-950">
-                      {racha.title}
-                    </h2>
-                    <p className="text-sm text-slate-600">
-                      {formatDateTimeShort(racha.eventDate)} •{" "}
-                      {racha.locationName} •{" "}
-                      {formatCurrencyFromCents(racha.priceInCents)}
-                    </p>
-                    {!racha.pixKey.trim() ? (
-                      <p className="text-sm text-amber-700">
-                        Configure a chave PIX do organizador para publicar este
-                        racha e liberar inscricoes.
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <ShareRachaButton slug={racha.slug} title={racha.title} />
-                    <Button
-                      asChild
-                      href={`/rachas/${racha.slug}`}
-                      variant="outline"
-                    >
-                      Ver página pública
-                    </Button>
-                    <Button asChild href={`/dashboard/rachas/${racha.id}/edit`}>
-                      Gerenciar
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-slate-500">Confirmados</p>
-                        <p className="mt-1 text-2xl font-bold text-slate-950">
-                          {confirmed}/{racha.athleteLimit}
-                        </p>
-                      </div>
-                      <ConfirmedListModal
-                        rachaId={racha.id}
-                        rachaTitle={racha.title}
-                        eventDate={racha.eventDate}
-                        locationName={racha.locationName}
-                        enrollments={confirmedEnrollments.map((item) => ({
-                          id: item.id,
-                          participantName: item.participantName,
-                          participantPhone: item.participantPhone,
-                          participantPosition: item.participantPosition,
-                          participantLevel: item.participantLevel,
-                          status: item.status,
-                          paymentStatus: item.paymentStatus,
-                        }))}
-                        athleteLimit={racha.athleteLimit}
-                        priceInCents={racha.priceInCents}
-                        goalkeeperLimit={racha.goalkeeperLimit}
-                        whatsappGroupUrl={racha.whatsappGroupUrl}
-                      />
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-amber-50 p-4 text-sm ring-1 ring-amber-100">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-amber-700">Aguardando pagamento</p>
-                        <p className="mt-1 text-2xl font-bold text-amber-900">
-                          {awaitingPayment}
-                        </p>
-                      </div>
-                      <PendingPaymentsModal
-                        callbackUrl="/dashboard"
-                        enrollments={pendingEnrollments}
-                        rachaTitle={racha.title}
-                      />
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                    <p className="text-slate-500">Lista de espera</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-950">
-                      {waitlist}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-slate-500">Todos os atletas</p>
-                        <p className="mt-1 text-2xl font-bold text-slate-950">
-                          {totalAthletes}
-                        </p>
-                      </div>
-                      <AllAthletesListModal
-                        rachaId={racha.id}
-                        rachaTitle={racha.title}
-                        eventDate={racha.eventDate}
-                        locationName={racha.locationName}
-                        enrollments={racha.enrollments.map((item) => ({
-                          id: item.id,
-                          createdAt: item.createdAt,
-                          participantName: item.participantName,
-                          participantPhone: item.participantPhone,
-                          participantPosition: item.participantPosition,
-                          participantLevel: item.participantLevel,
-                          status: item.status,
-                          paymentStatus: item.paymentStatus,
-                        }))}
-                        athleteLimit={racha.athleteLimit}
-                        goalkeeperLimit={racha.goalkeeperLimit}
-                        slug={racha.slug}
-                        whatsappGroupUrl={racha.whatsappGroupUrl}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <DeleteRachaDialog
-                  enrollments={racha.enrollments}
-                  rachaId={racha.id}
-                  rachaPixKey={racha.pixKey}
-                  rachaTitle={racha.title}
-                />
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      <DashboardRachaList
+        adminRachaIds={adminRachaIds}
+        currentUserId={session.user.id}
+        rachas={rachas}
+      />
     </div>
   );
 }

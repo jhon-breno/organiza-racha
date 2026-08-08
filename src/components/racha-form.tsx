@@ -26,6 +26,7 @@ type RachaFormValues = {
   rules?: string;
   athleteLimit?: number;
   eventDate?: Date;
+  eventEndDate?: Date | null;
   paymentDeadline?: Date | null;
   locationName?: string;
   address?: string;
@@ -465,7 +466,7 @@ export function RachaForm({
           </label>
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
-            Horário
+            Horário de início
             <Input
               defaultValue={
                 defaultValues?.eventDate
@@ -475,6 +476,19 @@ export function RachaForm({
               name="eventTime"
               type="time"
               required
+            />
+          </label>
+
+          <label className="space-y-2 text-sm font-medium text-slate-700">
+            Horário de encerramento
+            <Input
+              defaultValue={
+                defaultValues?.eventEndDate
+                  ? formatTimeInput(defaultValues.eventEndDate)
+                  : ""
+              }
+              name="eventEndTime"
+              type="time"
             />
           </label>
 

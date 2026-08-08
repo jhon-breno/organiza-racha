@@ -1162,6 +1162,7 @@ export async function createRachaAction(formData: FormData) {
     athleteLimit: getStringValue(formData, "athleteLimit"),
     eventDate: getStringValue(formData, "eventDate"),
     eventTime: getStringValue(formData, "eventTime"),
+    eventEndTime: getStringValue(formData, "eventEndTime"),
     isRecurring: formData.get("isRecurring") === "true",
     recurrenceFrequency: getStringValue(formData, "recurrenceFrequency"),
     paymentDeadlineDate: getStringValue(formData, "paymentDeadlineDate"),
@@ -1204,6 +1205,16 @@ export async function createRachaAction(formData: FormData) {
     parsed.data.eventDate,
     parsed.data.eventTime,
   );
+  let eventEndDate: Date | null = null;
+  if (parsed.data.eventEndTime?.trim()) {
+    eventEndDate = combineDateAndTime(
+      parsed.data.eventDate,
+      parsed.data.eventEndTime,
+    );
+    if (eventEndDate <= eventDate) {
+      eventEndDate.setDate(eventEndDate.getDate() + 1);
+    }
+  }
   const isFree = parsed.data.price === 0;
   const paymentDeadline =
     !isFree && parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
@@ -1230,6 +1241,7 @@ export async function createRachaAction(formData: FormData) {
       rules: parsed.data.rules,
       athleteLimit: parsed.data.athleteLimit,
       eventDate,
+      eventEndDate,
       isRecurring: parsed.data.isRecurring ?? false,
       recurrenceFrequency: parsed.data.isRecurring
         ? (parsed.data.recurrenceFrequency as RecurrenceFrequency | "") || null
@@ -1305,6 +1317,7 @@ export async function updateRachaAction(formData: FormData) {
     athleteLimit: getStringValue(formData, "athleteLimit"),
     eventDate: getStringValue(formData, "eventDate"),
     eventTime: getStringValue(formData, "eventTime"),
+    eventEndTime: getStringValue(formData, "eventEndTime"),
     isRecurring: formData.get("isRecurring") === "true",
     recurrenceFrequency: getStringValue(formData, "recurrenceFrequency"),
     paymentDeadlineDate: getStringValue(formData, "paymentDeadlineDate"),
@@ -1348,6 +1361,16 @@ export async function updateRachaAction(formData: FormData) {
     parsed.data.eventDate,
     parsed.data.eventTime,
   );
+  let eventEndDate: Date | null = null;
+  if (parsed.data.eventEndTime?.trim()) {
+    eventEndDate = combineDateAndTime(
+      parsed.data.eventDate,
+      parsed.data.eventEndTime,
+    );
+    if (eventEndDate <= eventDate) {
+      eventEndDate.setDate(eventEndDate.getDate() + 1);
+    }
+  }
   const isFree = parsed.data.price === 0;
   const paymentDeadline =
     !isFree && parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
@@ -1375,6 +1398,7 @@ export async function updateRachaAction(formData: FormData) {
       rules: parsed.data.rules,
       athleteLimit: parsed.data.athleteLimit,
       eventDate,
+      eventEndDate,
       isRecurring: parsed.data.isRecurring ?? false,
       recurrenceFrequency: parsed.data.isRecurring
         ? (parsed.data.recurrenceFrequency as RecurrenceFrequency | "") || null

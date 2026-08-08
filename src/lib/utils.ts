@@ -164,18 +164,40 @@ export function formatCurrencyFromCents(value: number) {
   }).format(value / 100);
 }
 
-export function formatDateTime(date: Date) {
+export function formatDateTime(date: Date, endDate?: Date | null) {
   const normalized = normalizeDateValue(date);
   const parts = getTimeZoneParts(normalized);
   const monthName = getTimeZoneFormatter({ month: "long" }).format(normalized);
 
+  if (endDate) {
+    const endNormalized = normalizeDateValue(endDate);
+    const endParts = getTimeZoneParts(endNormalized);
+    return `${parts.day} de ${monthName} das ${parts.hour}:${parts.minute} às ${endParts.hour}:${endParts.minute}`;
+  }
+
   return `${parts.day} de ${monthName} às ${parts.hour}:${parts.minute}`;
 }
 
-export function formatDateTimeShort(date: Date) {
+export function formatDateTimeShort(date: Date, endDate?: Date | null) {
   const parts = getTimeZoneParts(date);
 
+  if (endDate) {
+    const endParts = getTimeZoneParts(endDate);
+    return `${parts.day}/${parts.month}/${parts.year} das ${parts.hour}:${parts.minute} às ${endParts.hour}:${endParts.minute}`;
+  }
+
   return `${parts.day}/${parts.month}/${parts.year} às ${parts.hour}:${parts.minute}`;
+}
+
+export function isRachaEnded(racha: {
+  eventDate: Date;
+  eventEndDate?: Date | null;
+  status?: string;
+}) {
+  if (racha.status === "COMPLETED") return true;
+  const now = new Date();
+  const effectiveEndDate = racha.eventEndDate ?? racha.eventDate;
+  return effectiveEndDate < now;
 }
 
 export function formatDateInput(date: Date) {

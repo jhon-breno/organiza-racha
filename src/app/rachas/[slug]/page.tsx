@@ -162,7 +162,7 @@ export default async function RachaDetailsPage({
                   Data
                 </p>
                 <p className="mt-2 text-sm font-semibold">
-                  {formatDateTime(racha.eventDate)}
+                  {formatDateTime(racha.eventDate, racha.eventEndDate)}
                 </p>
               </Card>
               <Card className="border-white/10 bg-white/10 p-4 text-white shadow-none">

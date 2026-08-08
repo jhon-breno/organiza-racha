@@ -29,6 +29,7 @@ export const rachaFormSchema = z
       .max(200, "Limite máximo de 200 atletas."),
     eventDate: z.string().min(1, "Informe a data do racha."),
     eventTime: z.string().min(1, "Informe o horário do racha."),
+    eventEndTime: z.string().optional().or(z.literal("")),
     isRecurring: z.coerce.boolean().optional(),
     recurrenceFrequency: z
       .enum(["WEEKLY", "BIWEEKLY", "MONTHLY"])

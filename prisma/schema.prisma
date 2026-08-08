@@ -95,6 +95,7 @@ model Racha {
   rules                   String
   athleteLimit            Int
   eventDate               DateTime
+  eventEndDate            DateTime?
   locationName            String
   address                 String
   city                    String

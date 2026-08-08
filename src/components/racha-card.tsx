@@ -77,7 +77,7 @@ export function RachaCard({ racha }: RachaCardProps) {
         <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
           <div className="flex items-center gap-2">
             <Clock3 className="h-4 w-4 text-teal-600" />
-            <span>{formatDateTime(racha.eventDate)}</span>
+            <span>{formatDateTime(racha.eventDate, racha.eventEndDate)}</span>
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-teal-600" />
