@@ -93,7 +93,9 @@ export default async function RachaDetailsPage({
       })
     : null;
   const confirmedPaidParticipants = racha.enrollments.filter(
-    (item) => isConfirmedEnrollment(item) && !isGoalkeeperEnrollment(item),
+    (item) =>
+      isConfirmedEnrollment(item, racha.priceInCents) &&
+      !isGoalkeeperEnrollment(item),
   );
   const coverImageUrl = getRachaCoverImageUrl(
     racha.modality,

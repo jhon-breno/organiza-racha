@@ -77,7 +77,9 @@ export async function GET(request: NextRequest) {
     let enrollments = racha.enrollments;
 
     if (type === "confirmed") {
-      enrollments = enrollments.filter(isConfirmedEnrollment);
+      enrollments = enrollments.filter((item) =>
+        isConfirmedEnrollment(item, racha.priceInCents),
+      );
     } else if (type === "waitlist") {
       enrollments = enrollments.filter(
         (item) => item.status === "WAITLIST" && isVisibleEnrollment(item),

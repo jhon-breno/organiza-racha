@@ -30,12 +30,16 @@ type ConfirmedListModalProps = {
   locationName: string;
   enrollments: ExportableEnrollment[];
   athleteLimit: number;
+  priceInCents?: number;
   goalkeeperLimit?: number | null;
   whatsappGroupUrl?: string | null;
 };
 
-function getUnifiedStatus(enrollment: ExportableEnrollment): string {
-  if (isConfirmedEnrollment(enrollment)) {
+function getUnifiedStatus(
+  enrollment: ExportableEnrollment,
+  priceInCents?: number,
+): string {
+  if (isConfirmedEnrollment(enrollment, priceInCents)) {
     return "Confirmado";
   }
   return participantStatusLabels[enrollment.status] ?? enrollment.status;
@@ -49,6 +53,7 @@ function generateWhatsappMessage(
   goalkeeperEnrollments: ExportableEnrollment[],
   athleteLimit: number,
   goalkeeperLimit?: number | null,
+  priceInCents?: number,
 ): string {
   const dateStr = formatDateTimeShort(eventDate);
 
@@ -59,7 +64,7 @@ function generateWhatsappMessage(
 
   for (let i = 0; i < athleteLimit; i++) {
     if (i < lineEnrollments.length) {
-      const status = getUnifiedStatus(lineEnrollments[i]!);
+      const status = getUnifiedStatus(lineEnrollments[i]!, priceInCents);
       message += `${i + 1} - ${lineEnrollments[i]!.participantName} (${status})\n`;
     } else {
       message += `${i + 1} - \n`;
@@ -93,6 +98,7 @@ export function ConfirmedListModal({
   locationName,
   enrollments,
   athleteLimit,
+  priceInCents,
   goalkeeperLimit,
   whatsappGroupUrl,
 }: ConfirmedListModalProps) {
@@ -130,6 +136,7 @@ export function ConfirmedListModal({
         goalkeeperEnrollments,
         athleteLimit,
         goalkeeperLimit,
+        priceInCents,
       ),
     [
       athleteLimit,
@@ -138,6 +145,7 @@ export function ConfirmedListModal({
       goalkeeperLimit,
       lineEnrollments,
       locationName,
+      priceInCents,
       rachaTitle,
     ],
   );

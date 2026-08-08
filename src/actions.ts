@@ -1412,7 +1412,9 @@ export async function updateRachaAction(formData: FormData) {
     await prisma.enrollment.updateMany({
       where: {
         rachaId: id,
-        paymentStatus: PaymentStatus.PENDING,
+        paymentStatus: {
+          in: [PaymentStatus.PENDING, PaymentStatus.PROOF_SENT],
+        },
       },
       data: {
         paymentStatus: PaymentStatus.PAID,

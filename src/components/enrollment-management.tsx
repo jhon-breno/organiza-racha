@@ -55,11 +55,14 @@ function normalizeSearchValue(value: string) {
     .toLowerCase();
 }
 
-function getUnifiedEnrollmentStatus(enrollment: {
-  participantPosition?: string;
-  status: string;
-  paymentStatus: string;
-}) {
+function getUnifiedEnrollmentStatus(
+  enrollment: {
+    participantPosition?: string;
+    status: string;
+    paymentStatus: string;
+  },
+  rachaPriceInCents?: number,
+) {
   if (
     enrollment.status === "CANCELED" ||
     enrollment.paymentStatus === "REFUNDED"
@@ -84,7 +87,7 @@ function getUnifiedEnrollmentStatus(enrollment: {
     };
   }
 
-  if (isConfirmedEnrollment(enrollment)) {
+  if (isConfirmedEnrollment(enrollment, rachaPriceInCents)) {
     return {
       label: "Confirmado",
       badgeClassName: "bg-emerald-100 text-emerald-700",
@@ -100,10 +103,12 @@ function getUnifiedEnrollmentStatus(enrollment: {
 export function EnrollmentManagement({
   enrollments,
   modality,
+  priceInCents,
   rachaId,
 }: {
   rachaId: string;
   modality: string;
+  priceInCents?: number;
   enrollments: {
     id: string;
     participantName: string;
@@ -321,7 +326,10 @@ export function EnrollmentManagement({
         </Card>
       ) : (
         filteredEnrollments.map((enrollment) => {
-          const unifiedStatus = getUnifiedEnrollmentStatus(enrollment);
+          const unifiedStatus = getUnifiedEnrollmentStatus(
+            enrollment,
+            priceInCents,
+          );
 
           return (
             <Card key={enrollment.id} className="space-y-4">

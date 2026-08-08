@@ -151,13 +151,18 @@ export default async function DashboardPage({
     (total, racha) =>
       total +
       racha.enrollments.filter(
-        (item) => isConfirmedEnrollment(item) && !isGoalkeeperEnrollment(item),
+        (item) =>
+          isConfirmedEnrollment(item, racha.priceInCents) &&
+          !isGoalkeeperEnrollment(item),
       ).length,
     0,
   );
   const pendingParticipants = rachas.reduce(
     (total, racha) =>
-      total + racha.enrollments.filter(isAwaitingPaymentEnrollment).length,
+      total +
+      racha.enrollments.filter((item) =>
+        isAwaitingPaymentEnrollment(item, racha.priceInCents),
+      ).length,
     0,
   );
   const refundRequests = rachas.reduce(
@@ -336,20 +341,22 @@ export default async function DashboardPage({
             const isInvitedAdmin =
               racha.organizerId !== session.user.id &&
               adminRachaIdSet.has(racha.id);
-            const confirmedEnrollments = racha.enrollments.filter(
-              isConfirmedEnrollment,
+            const confirmedEnrollments = racha.enrollments.filter((item) =>
+              isConfirmedEnrollment(item, racha.priceInCents),
             );
             const confirmed = confirmedEnrollments.filter(
               (item) => !isGoalkeeperEnrollment(item),
             ).length;
-            const awaitingPayment = racha.enrollments.filter(
-              isAwaitingPaymentEnrollment,
+            const awaitingPayment = racha.enrollments.filter((item) =>
+              isAwaitingPaymentEnrollment(item, racha.priceInCents),
             ).length;
             const waitlist = racha.enrollments.filter(
               (item) => item.status === ParticipantStatus.WAITLIST,
             ).length;
             const pendingEnrollments = racha.enrollments
-              .filter(isAwaitingPaymentEnrollment)
+              .filter((item) =>
+                isAwaitingPaymentEnrollment(item, racha.priceInCents),
+              )
               .map((item) => ({
                 id: item.id,
                 participantName: item.participantName,
@@ -438,6 +445,7 @@ export default async function DashboardPage({
                           paymentStatus: item.paymentStatus,
                         }))}
                         athleteLimit={racha.athleteLimit}
+                        priceInCents={racha.priceInCents}
                         goalkeeperLimit={racha.goalkeeperLimit}
                         whatsappGroupUrl={racha.whatsappGroupUrl}
                       />

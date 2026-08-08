@@ -109,9 +109,11 @@ export default async function EditRachaPage({
   );
 
   const editPageUrl = `/dashboard/rachas/${racha.id}/edit`;
-  const confirmedEnrollments = racha.enrollments.filter(isConfirmedEnrollment);
+  const confirmedEnrollments = racha.enrollments.filter((item) =>
+    isConfirmedEnrollment(item, racha.priceInCents),
+  );
   const pendingEnrollments = racha.enrollments
-    .filter(isAwaitingPaymentEnrollment)
+    .filter((item) => isAwaitingPaymentEnrollment(item, racha.priceInCents))
     .map((item) => ({
       id: item.id,
       participantName: item.participantName,
@@ -215,6 +217,7 @@ export default async function EditRachaPage({
                   paymentStatus: item.paymentStatus,
                 }))}
                 athleteLimit={racha.athleteLimit}
+                priceInCents={racha.priceInCents}
                 goalkeeperLimit={racha.goalkeeperLimit}
                 whatsappGroupUrl={racha.whatsappGroupUrl}
               />
@@ -294,6 +297,7 @@ export default async function EditRachaPage({
             blockedForNextRacha: blockedUserIds.has(enrollment.userId),
           }))}
           modality={racha.modality}
+          priceInCents={racha.priceInCents}
           rachaId={racha.id}
         />
       </section>

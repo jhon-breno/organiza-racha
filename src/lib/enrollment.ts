@@ -28,14 +28,23 @@ export function isVisibleEnrollment(enrollment: {
   );
 }
 
-export function isConfirmedEnrollment(enrollment: EnrollmentWithStatus) {
+export function isConfirmedEnrollment(
+  enrollment: EnrollmentWithStatus,
+  rachaPriceInCents?: number,
+) {
+  if (rachaPriceInCents === 0 && enrollment.status === "ACTIVE") {
+    return true;
+  }
   return (
     enrollment.status === "ACTIVE" &&
     (enrollment.paymentStatus === "PAID" || isGoalkeeperEnrollment(enrollment))
   );
 }
 
-export function getEnrollmentStatusLabel(enrollment: EnrollmentWithStatus) {
+export function getEnrollmentStatusLabel(
+  enrollment: EnrollmentWithStatus,
+  rachaPriceInCents?: number,
+) {
   if (enrollment.status === "CANCELED") {
     return "Cancelado";
   }
@@ -48,7 +57,7 @@ export function getEnrollmentStatusLabel(enrollment: EnrollmentWithStatus) {
   if (enrollment.status === "WAITLIST") {
     return "Lista de espera";
   }
-  if (isConfirmedEnrollment(enrollment)) {
+  if (isConfirmedEnrollment(enrollment, rachaPriceInCents)) {
     return "Confirmado";
   }
   if (
@@ -126,7 +135,13 @@ export function compareEnrollmentsForExport(
   );
 }
 
-export function isAwaitingPaymentEnrollment(enrollment: EnrollmentWithStatus) {
+export function isAwaitingPaymentEnrollment(
+  enrollment: EnrollmentWithStatus,
+  rachaPriceInCents?: number,
+) {
+  if (rachaPriceInCents === 0) {
+    return false;
+  }
   return (
     enrollment.status === "ACTIVE" &&
     (enrollment.paymentStatus === "PENDING" ||
