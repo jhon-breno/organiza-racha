@@ -143,6 +143,7 @@ const authResult = NextAuth({
             name: true,
             email: true,
             image: true,
+            mustChangePassword: true,
           },
         });
 
@@ -150,6 +151,7 @@ const authResult = NextAuth({
           token.name = dbUser.name ?? undefined;
           token.email = dbUser.email ?? undefined;
           token.picture = dbUser.image ?? undefined;
+          token.mustChangePassword = dbUser.mustChangePassword;
         }
       }
 
@@ -158,6 +160,7 @@ const authResult = NextAuth({
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.mustChangePassword = Boolean(token.mustChangePassword);
 
         if (typeof token.name === "string") {
           session.user.name = token.name;

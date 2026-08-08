@@ -17,6 +17,7 @@ import {
   positionOptionsVolei,
 } from "@/lib/constants";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { detectIsFemaleByName } from "@/lib/gender";
 
 export function JoinRachaForm({
   privateAccessGranted = false,
@@ -60,6 +61,13 @@ export function JoinRachaForm({
   const organizerWhatsappMessage = `Eu quero participar no racha *${racha.title}*. Por favor me informar a chave para entrar na lista`;
   const organizerWhatsappUrl = `https://wa.me/${racha.phoneWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(organizerWhatsappMessage)}`;
   const [selectedPosition, setSelectedPosition] = useState("Versátil");
+  const [participantName, setParticipantName] = useState(
+    defaultParticipantName ?? "",
+  );
+  const [isFemale, setIsFemale] = useState(() =>
+    detectIsFemaleByName(defaultParticipantName ?? ""),
+  );
+  const [isFemaleTouched, setIsFemaleTouched] = useState(false);
 
   const availablePositions =
     racha.modality === "FUTEBOL"
@@ -190,11 +198,37 @@ export function JoinRachaForm({
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Seu nome
             <Input
-              defaultValue={defaultParticipantName ?? ""}
               name="participantName"
+              onChange={(e) => {
+                const newName = e.target.value;
+                setParticipantName(newName);
+                if (!isFemaleTouched) {
+                  setIsFemale(detectIsFemaleByName(newName));
+                }
+              }}
               placeholder="Nome completo"
               required
+              value={participantName}
             />
+          </label>
+
+          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-800 cursor-pointer">
+            <input
+              checked={isFemale}
+              className="h-4 w-4 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
+              name="isFemale"
+              onChange={(e) => {
+                setIsFemale(e.target.checked);
+                setIsFemaleTouched(true);
+              }}
+              type="checkbox"
+            />
+            <div className="flex flex-col">
+              <span>Atleta do sexo feminino (Mulher)</span>
+              <span className="text-xs font-normal text-slate-500">
+                Ajuda a equilibrar os times no sorteio de rachas mistos.
+              </span>
+            </div>
           </label>
 
           <label className="space-y-2 text-sm font-medium text-slate-700">

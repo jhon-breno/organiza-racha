@@ -152,7 +152,11 @@ function DrawerContent({
 
             <div className="border-b border-slate-200 bg-white px-4 py-4">
               {isLoggedIn ? (
-                <div className="flex items-center gap-3">
+                <Link
+                  className="flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-slate-50"
+                  href="/perfil"
+                  onClick={closeMenu}
+                >
                   <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-teal-600 text-sm font-bold text-white">
                     {user?.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -174,7 +178,7 @@ function DrawerContent({
                       {firstName}
                     </p>
                   </div>
-                </div>
+                </Link>
               ) : (
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-base font-bold text-slate-950">
@@ -224,6 +228,16 @@ function DrawerContent({
                     onClick={closeMenu}
                   >
                     Painel do organizador
+                  </Link>
+                  <Link
+                    className={buttonVariants({
+                      variant: "ghost",
+                      className: "justify-start",
+                    })}
+                    href="/perfil"
+                    onClick={closeMenu}
+                  >
+                    Meu perfil
                   </Link>
                   <button
                     className={buttonVariants({

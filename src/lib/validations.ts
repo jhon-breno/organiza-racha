@@ -200,6 +200,7 @@ export const enrollmentSchema = z
     participantPhone: z.string().min(8, "Informe um telefone válido."),
     participantPosition: z.string().min(2, "Informe sua posição."),
     participantLevel: z.enum(participantLevelValues),
+    isFemale: z.coerce.boolean().optional(),
     notes: z
       .string()
       .max(280, "Observações com no máximo 280 caracteres.")
@@ -224,6 +225,7 @@ export const organizerEnrollmentSchema = z.object({
   ),
   participantPosition: z.string().min(2, "Informe a posição do participante."),
   participantLevel: z.enum(participantLevelValues),
+  isFemale: z.coerce.boolean().optional(),
   notes: z
     .string()
     .max(280, "Observações com no máximo 280 caracteres.")

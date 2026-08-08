@@ -36,16 +36,15 @@ export function QuickJoinModal({
 }: QuickJoinModalProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [open, setOpen] = useState(defaultOpen);
-  const [isMounted, setIsMounted] = useState(false);
+  const isQuickJoinParam = searchParams.get("quickJoin") === "true";
+  const [open, setOpen] = useState(defaultOpen || isQuickJoinParam);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setIsMounted(true);
-    if (searchParams.get("quickJoin") === "true") {
-      setOpen(true);
-    }
-  }, [searchParams]);
+  const [prevQuickJoin, setPrevQuickJoin] = useState(isQuickJoinParam);
+  if (isQuickJoinParam && !prevQuickJoin) {
+    setPrevQuickJoin(true);
+    setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -96,7 +95,6 @@ export function QuickJoinModal({
       </Button>
 
       {open &&
-        isMounted &&
         createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div

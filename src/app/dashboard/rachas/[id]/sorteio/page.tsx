@@ -55,6 +55,7 @@ export default async function RachaTeamDrawPage({
       participantPhone: item.participantPhone,
       participantPosition: item.participantPosition,
       participantLevel: item.participantLevel,
+      isFemale: item.isFemale,
     }));
 
   return (

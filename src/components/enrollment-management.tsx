@@ -2,14 +2,15 @@
 
 import { useMemo, useState } from "react";
 import {
-  addOrganizerEnrollmentAction,
   bulkAddOrganizerEnrollmentsAction,
   cancelPendingPaymentEnrollmentsAction,
   confirmEnrollmentPaymentAction,
   markEnrollmentRefundedAction,
   removeOrganizerEnrollmentAction,
+  toggleOrganizerEnrollmentFemaleAction,
   toggleOrganizerNextRachaBlockAction,
   updateOrganizerEnrollmentLevelAction,
+  updateOrganizerEnrollmentPositionAction,
   updateOrganizerEnrollmentStatusAction,
 } from "@/actions";
 import { AddAthleteModal } from "@/components/add-athlete-modal";
@@ -17,7 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
@@ -116,6 +116,7 @@ export function EnrollmentManagement({
     participantPhone: string;
     participantPosition: string;
     participantLevel: string;
+    isFemale?: boolean;
     status: string;
     paymentStatus: string;
     blockedForNextRacha?: boolean;
@@ -278,13 +279,28 @@ export function EnrollmentManagement({
             priceInCents,
           );
 
+          const positionOptionsForCard = Array.from(
+            new Set(
+              [...availablePositions, enrollment.participantPosition].filter(
+                Boolean,
+              ),
+            ),
+          );
+
           return (
             <Card key={enrollment.id} className="space-y-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-slate-950">
-                    {enrollment.participantName}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-950">
+                      {enrollment.participantName}
+                    </h3>
+                    {enrollment.isFemale && (
+                      <Badge className="border border-pink-200 bg-pink-100 text-pink-700">
+                        ♀ Mulher
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-600">
                     {formatPhone(enrollment.participantPhone)} •{" "}
                     {enrollment.participantPosition} •{" "}
@@ -329,6 +345,59 @@ export function EnrollmentManagement({
                     variant="outline"
                   >
                     Salvar nível
+                  </SubmitButton>
+                </form>
+
+                <form
+                  action={updateOrganizerEnrollmentPositionAction}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    name="enrollmentId"
+                    type="hidden"
+                    value={enrollment.id}
+                  />
+                  <Select
+                    defaultValue={enrollment.participantPosition}
+                    name="participantPosition"
+                  >
+                    {positionOptionsForCard.map((pos) => (
+                      <option key={pos} value={pos}>
+                        {pos}
+                      </option>
+                    ))}
+                  </Select>
+                  <SubmitButton
+                    pendingLabel="Salvando..."
+                    size="sm"
+                    variant="outline"
+                  >
+                    Salvar posição
+                  </SubmitButton>
+                </form>
+
+                <form action={toggleOrganizerEnrollmentFemaleAction}>
+                  <input
+                    name="enrollmentId"
+                    type="hidden"
+                    value={enrollment.id}
+                  />
+                  <input
+                    name="isFemale"
+                    type="hidden"
+                    value={enrollment.isFemale ? "false" : "true"}
+                  />
+                  <SubmitButton
+                    className={
+                      enrollment.isFemale
+                        ? "border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 font-medium"
+                        : ""
+                    }
+                    pendingLabel="Atualizando..."
+                    size="sm"
+                    variant="outline"
+                  >
+                    {enrollment.isFemale ? "♀ Mulher (Ativo)" : "♀ Flag Mulher"}
                   </SubmitButton>
                 </form>
 

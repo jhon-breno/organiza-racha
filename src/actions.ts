@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { hash } from "bcryptjs";
+import { compare, hash } from "bcryptjs";
 import {
   PaymentStatus,
   ParticipantStatus,
@@ -16,6 +16,7 @@ import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured, signIn, signOut } from "@/auth";
 import { ORGANIZER_DEFAULT_PHONE } from "@/lib/constants";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { detectIsFemaleByName } from "@/lib/gender";
 import { participantLevelValues } from "@/lib/participant-level";
 import { prisma } from "@/lib/prisma";
 import {
@@ -189,17 +190,26 @@ async function hasDuplicatedPhoneEnrollment(
 async function getOrCreateParticipantUser(input: {
   name: string;
   phone: string;
+  isFemale?: boolean;
 }) {
+  const isFemaleValue = input.isFemale ?? detectIsFemaleByName(input.name);
+
   const existingUser = await prisma.user.findUnique({
     where: { phone: input.phone },
-    select: { id: true, name: true },
+    select: { id: true, name: true, isFemale: true },
   });
 
   if (existingUser) {
-    if (!existingUser.name?.trim() && input.name.trim()) {
+    const shouldUpdateName = !existingUser.name?.trim() && input.name.trim();
+    const shouldUpdateFemale = isFemaleValue && !existingUser.isFemale;
+
+    if (shouldUpdateName || shouldUpdateFemale) {
       await prisma.user.update({
         where: { id: existingUser.id },
-        data: { name: input.name.trim() },
+        data: {
+          ...(shouldUpdateName ? { name: input.name.trim() } : {}),
+          ...(shouldUpdateFemale ? { isFemale: true } : {}),
+        },
       });
     }
 
@@ -211,8 +221,9 @@ async function getOrCreateParticipantUser(input: {
       data: {
         name: input.name,
         phone: input.phone,
+        isFemale: isFemaleValue,
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, isFemale: true },
     });
   } catch (error) {
     if (
@@ -221,7 +232,7 @@ async function getOrCreateParticipantUser(input: {
     ) {
       const userCreatedInParallel = await prisma.user.findUnique({
         where: { phone: input.phone },
-        select: { id: true, name: true },
+        select: { id: true, name: true, isFemale: true },
       });
 
       if (userCreatedInParallel) {
@@ -322,9 +333,13 @@ async function createOrganizerEnrollmentForRacha(input: {
     participantPhone: string;
     participantPosition: string;
     participantLevel: (typeof participantLevelValues)[number];
+    isFemale?: boolean;
     notes?: string;
   };
 }) {
+  const isFemaleValue =
+    input.enrollment.isFemale ??
+    detectIsFemaleByName(input.enrollment.participantName);
   const isGoalkeeperEnrollment =
     input.racha.modality === "FUTEBOL" &&
     isGoalkeeperPosition(input.enrollment.participantPosition);
@@ -413,12 +428,14 @@ async function createOrganizerEnrollmentForRacha(input: {
     ? await prisma.user.create({
         data: {
           name: input.enrollment.participantName,
+          isFemale: isFemaleValue,
         },
         select: { id: true, name: true },
       })
     : await getOrCreateParticipantUser({
         name: input.enrollment.participantName,
         phone: normalizedPhone,
+        isFemale: isFemaleValue,
       });
 
   await prisma.enrollment.create({
@@ -429,6 +446,7 @@ async function createOrganizerEnrollmentForRacha(input: {
       participantPhone: normalizedPhone,
       participantPosition: input.enrollment.participantPosition,
       participantLevel: input.enrollment.participantLevel,
+      isFemale: isFemaleValue,
       acceptedRules: true,
       pixPaid: nextPixPaid,
       notes: input.enrollment.notes || null,
@@ -600,11 +618,40 @@ export async function signInWithCredentialsAction(formData: FormData) {
     );
   }
 
+  const normalizedIdentifier = parsed.data.identifier.trim();
+  const isEmail = normalizedIdentifier.includes("@");
+
+  const existingUser = isEmail
+    ? await prisma.user.findUnique({
+        where: { email: normalizedIdentifier.toLowerCase() },
+        select: { id: true, passwordHash: true, mustChangePassword: true },
+      })
+    : await prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: normalizedIdentifier },
+            { phone: normalizePhoneValue(normalizedIdentifier) },
+          ],
+        },
+        select: { id: true, passwordHash: true, mustChangePassword: true },
+      });
+
+  let targetRedirect = callbackUrl;
+  if (existingUser?.passwordHash) {
+    const passwordMatches = await compare(
+      parsed.data.password,
+      existingUser.passwordHash,
+    );
+    if (passwordMatches && existingUser.mustChangePassword) {
+      targetRedirect = `/auth/change-password?required=true&callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    }
+  }
+
   try {
     await signIn("credentials", {
       identifier: parsed.data.identifier,
       password: parsed.data.password,
-      redirectTo: callbackUrl,
+      redirectTo: targetRedirect,
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -838,6 +885,7 @@ export async function resetPasswordAction(formData: FormData) {
       passwordHash,
       passwordResetToken: null,
       passwordResetExpires: null,
+      mustChangePassword: false,
     },
   });
 
@@ -1069,11 +1117,19 @@ export async function createOrganizerUserAction(formData: FormData) {
 
   const passwordHash = await hash(parsed.data.password, 10);
 
+  const isFemaleInput =
+    formData.get("isFemale") === "true" ||
+    formData.get("isFemale") === "on";
+  const isFemaleValue =
+    isFemaleInput || detectIsFemaleByName(parsed.data.name);
+
   const createData: Record<string, unknown> = {
     name: parsed.data.name,
     phone,
     email,
     passwordHash,
+    isFemale: isFemaleValue,
+    mustChangePassword: true,
   };
 
   if (canUseNickname && parsed.data.nickname) {
@@ -1081,7 +1137,7 @@ export async function createOrganizerUserAction(formData: FormData) {
   }
 
   await prisma.user.create({
-    data: createData as any,
+    data: createData as Prisma.UserCreateInput,
   });
 
   revalidatePath("/dashboard");
@@ -1507,6 +1563,11 @@ export async function joinRachaAction(formData: FormData) {
   const session = await auth();
   const rachaId = getStringValue(formData, "rachaId");
 
+  const isFemaleInput =
+    formData.get("isFemale") === "true" ||
+    formData.get("isFemale") === "on" ||
+    formData.get("isFemale") === "1";
+
   const parsed = enrollmentSchema.safeParse({
     rachaId,
     slug,
@@ -1514,6 +1575,7 @@ export async function joinRachaAction(formData: FormData) {
     participantPhone: getStringValue(formData, "participantPhone"),
     participantPosition: getStringValue(formData, "participantPosition"),
     participantLevel: getStringValue(formData, "participantLevel"),
+    isFemale: isFemaleInput,
     notes: getStringValue(formData, "notes"),
     acceptedRules: formData.get("acceptedRules") === "on",
     paymentCommitment: formData.get("paymentCommitment") === "on",
@@ -1662,12 +1724,24 @@ export async function joinRachaAction(formData: FormData) {
     }
   }
 
+  const isFemaleValue =
+    parsed.data.isFemale ??
+    detectIsFemaleByName(parsed.data.participantName);
+
   const participantUser = session?.user?.id
     ? { id: session.user.id }
     : await getOrCreateParticipantUser({
         name: parsed.data.participantName,
         phone: normalizedPhone,
+        isFemale: isFemaleValue,
       });
+
+  if (session?.user?.id) {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { isFemale: isFemaleValue },
+    });
+  }
 
   const activeBlock = await prisma.organizerParticipantBlock.findUnique({
     where: {
@@ -1775,6 +1849,7 @@ export async function joinRachaAction(formData: FormData) {
         participantPhone: normalizedPhone,
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
+        isFemale: isFemaleValue,
         acceptedRules: true,
         pixPaid: nextPixPaid,
         notes: parsed.data.notes || null,
@@ -1793,6 +1868,7 @@ export async function joinRachaAction(formData: FormData) {
         participantPhone: normalizedPhone,
         participantPosition: parsed.data.participantPosition,
         participantLevel: parsed.data.participantLevel,
+        isFemale: isFemaleValue,
         acceptedRules: true,
         pixPaid: nextPixPaid,
         notes: parsed.data.notes || null,
@@ -1874,6 +1950,10 @@ export async function addOrganizerEnrollmentAction(formData: FormData) {
     participantPhone: getStringValue(formData, "participantPhone"),
     participantPosition: getStringValue(formData, "participantPosition"),
     participantLevel: getStringValue(formData, "participantLevel"),
+    isFemale:
+      formData.get("isFemale") === "true" ||
+      formData.get("isFemale") === "on" ||
+      formData.get("isFemale") === "1",
     notes: getStringValue(formData, "notes"),
   });
 
@@ -3054,3 +3134,316 @@ export async function removeRachaAdminAction(formData: FormData) {
     ),
   );
 }
+
+export async function updateUserProfileGenderAction(formData: FormData) {
+  const user = await requireUser("/minhas-inscricoes");
+  const isFemale =
+    formData.get("isFemale") === "true" ||
+    formData.get("isFemale") === "on" ||
+    formData.get("isFemale") === "1";
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { isFemale },
+  });
+
+  // Also sync current active/waitlist enrollments for this user
+  await prisma.enrollment.updateMany({
+    where: { userId: user.id },
+    data: { isFemale },
+  });
+
+  revalidatePath("/minhas-inscricoes");
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      "/minhas-inscricoes",
+      "success",
+      "Perfil atualizado com sucesso.",
+    ),
+  );
+}
+
+export async function changePasswordAction(formData: FormData) {
+  const user = await requireUser("/auth/signin");
+  const callbackUrl = getStringValue(formData, "callbackUrl") || "/";
+
+  const currentPassword = getStringValue(formData, "currentPassword");
+  const newPassword = getStringValue(formData, "newPassword");
+  const confirmPassword = getStringValue(formData, "confirmPassword");
+
+  if (!newPassword || newPassword.length < 6) {
+    redirect(
+      buildMessageUrl(
+        `/auth/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+        "error",
+        "A nova senha deve ter no mínimo 6 caracteres.",
+      ),
+    );
+  }
+
+  if (newPassword !== confirmPassword) {
+    redirect(
+      buildMessageUrl(
+        `/auth/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+        "error",
+        "A confirmação de senha não confere.",
+      ),
+    );
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { passwordHash: true },
+  });
+
+  if (dbUser?.passwordHash) {
+    if (!currentPassword) {
+      redirect(
+        buildMessageUrl(
+          `/auth/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          "error",
+          "Informe sua senha atual.",
+        ),
+      );
+    }
+    const isCurrentPasswordValid = await compare(
+      currentPassword,
+      dbUser.passwordHash,
+    );
+    if (!isCurrentPasswordValid) {
+      redirect(
+        buildMessageUrl(
+          `/auth/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          "error",
+          "A senha atual está incorreta.",
+        ),
+      );
+    }
+  }
+
+  const newPasswordHash = await hash(newPassword, 10);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: newPasswordHash,
+      mustChangePassword: false,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/dashboard");
+  revalidatePath("/minhas-inscricoes");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      "Sua senha foi alterada com sucesso!",
+    ),
+  );
+}
+
+export async function updateProfileAction(formData: FormData) {
+  const user = await requireUser("/auth/signin");
+
+  const name = getStringValue(formData, "name");
+  const nickname = getStringValue(formData, "nickname");
+  const rawPhone = getStringValue(formData, "phone");
+  const email = getStringValue(formData, "email")?.toLowerCase().trim();
+
+  if (!name || name.trim().length < 2) {
+    redirect(
+      buildMessageUrl(
+        "/perfil",
+        "error",
+        "Informe um nome válido com pelo menos 2 caracteres.",
+      ),
+    );
+  }
+
+  if (!email || !email.includes("@")) {
+    redirect(
+      buildMessageUrl("/perfil", "error", "Informe um e-mail válido."),
+    );
+  }
+
+  const emailInUse = await prisma.user.findFirst({
+    where: {
+      email,
+      NOT: { id: user.id },
+    },
+  });
+
+  if (emailInUse) {
+    redirect(
+      buildMessageUrl(
+        "/perfil",
+        "error",
+        "Este e-mail já está em uso por outra conta.",
+      ),
+    );
+  }
+
+  let phone: string | null = null;
+  if (rawPhone && rawPhone.trim().length > 0) {
+    phone = normalizePhoneValue(rawPhone);
+    const phoneInUse = await prisma.user.findFirst({
+      where: {
+        phone,
+        NOT: { id: user.id },
+      },
+    });
+
+    if (phoneInUse) {
+      redirect(
+        buildMessageUrl(
+          "/perfil",
+          "error",
+          "Este telefone já está cadastrado em outra conta.",
+        ),
+      );
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      name: name.trim(),
+      nickname: nickname?.trim() || null,
+      phone,
+      email,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/perfil");
+  revalidatePath("/dashboard");
+  revalidatePath("/minhas-inscricoes");
+
+  redirect(
+    buildMessageUrl(
+      "/perfil",
+      "success",
+      "Seu perfil foi atualizado com sucesso!",
+    ),
+  );
+}
+
+export async function updateOrganizerEnrollmentPositionAction(
+  formData: FormData,
+) {
+  const user = await requireUser("/dashboard");
+
+  const enrollmentId = getStringValue(formData, "enrollmentId");
+  const participantPosition = getStringValue(formData, "participantPosition");
+
+  if (!enrollmentId || !participantPosition) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        "Dados inválidos para alterar posição.",
+      ),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: { racha: true },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      participantPosition,
+    },
+  });
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      "Posição do participante atualizada com sucesso.",
+    ),
+  );
+}
+
+export async function toggleOrganizerEnrollmentFemaleAction(
+  formData: FormData,
+) {
+  const user = await requireUser("/dashboard");
+
+  const enrollmentId = getStringValue(formData, "enrollmentId");
+  const isFemaleStr = getStringValue(formData, "isFemale");
+  const isFemale = isFemaleStr === "true";
+
+  if (!enrollmentId) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: { racha: true },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      isFemale,
+    },
+  });
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+
+  revalidatePath(callbackUrl);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      isFemale
+        ? "Participante marcada como mulher."
+        : "Marcação de mulher removida.",
+    ),
+  );
+}
+

@@ -1,4 +1,5 @@
 import { isGoalkeeperPosition } from "@/lib/enrollment";
+import { detectIsFemaleByName } from "@/lib/gender";
 import { getParticipantLevelScore } from "@/lib/participant-level";
 import { formatDateTimeShort } from "@/lib/utils";
 
@@ -7,6 +8,7 @@ export type TeamDrawParticipant = {
   participantName: string;
   participantPosition: string;
   participantLevel: string;
+  isFemale?: boolean;
 };
 
 export type TeamDrawInput = {
@@ -20,9 +22,15 @@ export type DrawTeam = {
   id: string;
   name: string;
   players: TeamDrawParticipant[];
+  setters: TeamDrawParticipant[];
   goalkeepers: TeamDrawParticipant[];
   totalScore: number;
 };
+
+export function isSetterPosition(position?: string | null): boolean {
+  if (!position) return false;
+  return position.trim().toLowerCase() === "levantador";
+}
 
 function createSeededRandom(seed: number) {
   let current = seed % 2147483647;
@@ -37,7 +45,10 @@ function createSeededRandom(seed: number) {
   };
 }
 
-function shuffleSameScoreGroups(participants: TeamDrawParticipant[], seed: number) {
+function shuffleSameScoreGroups(
+  participants: TeamDrawParticipant[],
+  seed: number,
+) {
   const random = createSeededRandom(seed);
 
   return [...participants]
@@ -135,53 +146,139 @@ export function drawBalancedTeams({
   modality,
   seed,
 }: TeamDrawInput) {
-  const linePlayers =
-    modality === "FUTEBOL"
-      ? participants.filter(
-          (participant) => !isGoalkeeperPosition(participant.participantPosition),
-        )
-      : participants;
+  // 1. Separate Goalkeepers for Futebol
   const goalkeepers =
     modality === "FUTEBOL"
       ? participants.filter((participant) =>
           isGoalkeeperPosition(participant.participantPosition),
         )
       : [];
-  const targetSizes = buildTargetSizes(linePlayers.length, teamCount);
+
+  const nonGoalkeepers =
+    modality === "FUTEBOL"
+      ? participants.filter(
+          (participant) =>
+            !isGoalkeeperPosition(participant.participantPosition),
+        )
+      : participants;
+
+  // 2. Separate Setters (Levantadores)
+  const setters = nonGoalkeepers.filter((participant) =>
+    isSetterPosition(participant.participantPosition),
+  );
+  const nonSetters = nonGoalkeepers.filter(
+    (participant) => !isSetterPosition(participant.participantPosition),
+  );
+
+  // 3. Separate Female Players (Mulheres) among remaining players
+  const isFemaleParticipant = (participant: TeamDrawParticipant) =>
+    participant.isFemale ?? detectIsFemaleByName(participant.participantName);
+
+  const femalePlayers = nonSetters.filter(isFemaleParticipant);
+  const maleOrOtherPlayers = nonSetters.filter(
+    (participant) => !isFemaleParticipant(participant),
+  );
+
+  const linePlayerCount = nonGoalkeepers.length;
+  const targetSizes = buildTargetSizes(linePlayerCount, teamCount);
+
   const teams: DrawTeam[] = Array.from({ length: teamCount }, (_, index) => ({
     id: `team-${index + 1}`,
     name: `Time ${index + 1}`,
     players: [],
+    setters: [],
     goalkeepers: [],
     totalScore: 0,
   }));
 
-  const orderedPlayers = shuffleSameScoreGroups(linePlayers, seed);
   const random = createSeededRandom(seed + 97);
 
-  orderedPlayers.forEach((participant) => {
-    const score = getParticipantLevelScore(participant.participantLevel);
+  // Distribute Setters round-robin across teams
+  const shuffledSetters = shuffleSameScoreGroups(setters, seed + 311);
+  shuffledSetters.forEach((setter, index) => {
+    const targetTeam = teams[index % teams.length];
+    if (targetTeam) {
+      targetTeam.setters.push(setter);
+      targetTeam.totalScore += getParticipantLevelScore(setter.participantLevel);
+    }
+  });
+
+  // Distribute Female Players evenly across teams to balance mixed teams
+  const shuffledFemalePlayers = shuffleSameScoreGroups(femalePlayers, seed + 509);
+  shuffledFemalePlayers.forEach((femalePlayer) => {
+    const score = getParticipantLevelScore(femalePlayer.participantLevel);
+
     const eligibleTeams = teams
-      .map((team, index) => ({ team, index, targetSize: targetSizes[index] ?? 0 }))
-      .filter(({ team, targetSize }) => team.players.length < targetSize);
+      .map((team, index) => {
+        const currentSize = team.players.length + team.setters.length;
+        const femaleCount =
+          team.players.filter(isFemaleParticipant).length +
+          team.setters.filter(isFemaleParticipant).length;
+
+        return {
+          team,
+          index,
+          targetSize: targetSizes[index] ?? 0,
+          currentSize,
+          femaleCount,
+        };
+      })
+      .filter(({ currentSize, targetSize }) => currentSize < targetSize);
+
+    eligibleTeams.sort((left, right) => {
+      if (left.femaleCount !== right.femaleCount) {
+        return left.femaleCount - right.femaleCount;
+      }
+      if (left.team.totalScore !== right.team.totalScore) {
+        return left.team.totalScore - right.team.totalScore;
+      }
+      if (left.currentSize !== right.currentSize) {
+        return left.currentSize - right.currentSize;
+      }
+      return random() - 0.5;
+    });
+
+    const selectedTeam = eligibleTeams[0]?.team ?? teams[0];
+    selectedTeam.players.push(femalePlayer);
+    selectedTeam.totalScore += score;
+  });
+
+  // Distribute Remaining Line Players
+  const shuffledRemaining = shuffleSameScoreGroups(
+    maleOrOtherPlayers,
+    seed + 97,
+  );
+  shuffledRemaining.forEach((player) => {
+    const score = getParticipantLevelScore(player.participantLevel);
+
+    const eligibleTeams = teams
+      .map((team, index) => {
+        const currentSize = team.players.length + team.setters.length;
+        return {
+          team,
+          index,
+          targetSize: targetSizes[index] ?? 0,
+          currentSize,
+        };
+      })
+      .filter(({ currentSize, targetSize }) => currentSize < targetSize);
 
     eligibleTeams.sort((left, right) => {
       if (left.team.totalScore !== right.team.totalScore) {
         return left.team.totalScore - right.team.totalScore;
       }
-
-      if (left.team.players.length !== right.team.players.length) {
-        return left.team.players.length - right.team.players.length;
+      if (left.currentSize !== right.currentSize) {
+        return left.currentSize - right.currentSize;
       }
-
       return random() - 0.5;
     });
 
     const selectedTeam = eligibleTeams[0]?.team ?? teams[0];
-    selectedTeam.players.push(participant);
+    selectedTeam.players.push(player);
     selectedTeam.totalScore += score;
   });
 
+  // Distribute Goalkeepers for Futebol
   shuffleSameScoreGroups(goalkeepers, seed + 193).forEach(
     (goalkeeper, goalkeeperIndex) => {
       const selectedTeam = teams[goalkeeperIndex % teams.length];
@@ -216,8 +313,22 @@ export function buildTeamDrawMessage(
   teams.forEach((team) => {
     message += `*${team.name}* (${team.totalScore} pts)\n`;
 
-    team.players.forEach((player, index) => {
-      message += `${index + 1}. ${player.participantName}\n`;
+    let playerNum = 1;
+
+    if (team.setters.length > 0) {
+      team.setters.forEach((setter) => {
+        const isFemale =
+          setter.isFemale ?? detectIsFemaleByName(setter.participantName);
+        message += `${playerNum}. ${setter.participantName} (Levantador)${isFemale ? " 👩" : ""}\n`;
+        playerNum += 1;
+      });
+    }
+
+    team.players.forEach((player) => {
+      const isFemale =
+        player.isFemale ?? detectIsFemaleByName(player.participantName);
+      message += `${playerNum}. ${player.participantName}${isFemale ? " 👩" : ""}\n`;
+      playerNum += 1;
     });
 
     if (team.goalkeepers.length > 0) {

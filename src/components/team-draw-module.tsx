@@ -13,6 +13,7 @@ import {
   getSuggestedTeamCount,
   type TeamDrawParticipant,
 } from "@/lib/team-draw";
+import { detectIsFemaleByName } from "@/lib/gender";
 import {
   getParticipantLevelLabel,
   getParticipantLevelVisual,
@@ -392,34 +393,80 @@ export function TeamDrawModule({
                           <p className="text-xs text-slate-500">{team.totalScore} pontos totais</p>
                         </div>
                         <div className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                          {team.players.length + team.goalkeepers.length} atletas
+                          {team.players.length + team.setters.length + team.goalkeepers.length} atletas
                         </div>
                       </div>
 
+                      {team.setters.length > 0 ? (
+                        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-800">
+                            Levantadores
+                          </p>
+                          <div className="mt-2 space-y-2">
+                            {team.setters.map((setter) => {
+                              const isFemale =
+                                setter.isFemale ??
+                                detectIsFemaleByName(setter.participantName);
+                              return (
+                                <div
+                                  key={setter.id}
+                                  className="flex items-center justify-between gap-3 text-sm text-slate-800"
+                                >
+                                  <span className="flex items-center gap-1.5 font-medium">
+                                    {setter.participantName}
+                                    {isFemale ? (
+                                      <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
+                                        Feminino
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  <span className="text-xs text-amber-700">
+                                    {getParticipantLevelVisual(setter.participantLevel)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
                       <div className="mt-4 space-y-3">
-                        {team.players.map((participant, participantIndex) => (
-                          <div
-                            key={participant.id}
-                            className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-950">
-                                  {participantIndex + 1}. {participant.participantName}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {participant.participantPosition}
-                                </p>
-                              </div>
-                              <div className="text-right text-xs text-amber-700">
-                                <p className="font-semibold">
-                                  {getParticipantLevelVisual(participant.participantLevel)}
-                                </p>
-                                <p>{getParticipantLevelLabel(participant.participantLevel)}</p>
+                        {team.players.map((participant, participantIndex) => {
+                          const isFemale =
+                            participant.isFemale ??
+                            detectIsFemaleByName(participant.participantName);
+
+                          return (
+                            <div
+                              key={participant.id}
+                              className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-950">
+                                    <span>
+                                      {participantIndex + 1}. {participant.participantName}
+                                    </span>
+                                    {isFemale ? (
+                                      <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
+                                        Feminino
+                                      </span>
+                                    ) : null}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    {participant.participantPosition}
+                                  </p>
+                                </div>
+                                <div className="text-right text-xs text-amber-700">
+                                  <p className="font-semibold">
+                                    {getParticipantLevelVisual(participant.participantLevel)}
+                                  </p>
+                                  <p>{getParticipantLevelLabel(participant.participantLevel)}</p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {team.goalkeepers.length > 0 ? (

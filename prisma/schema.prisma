@@ -72,6 +72,8 @@ model User {
   passwordHash  String?
   passwordResetToken   String? @unique
   passwordResetExpires DateTime?
+  isFemale      Boolean      @default(false)
+  mustChangePassword Boolean @default(false)
   pixKey        String?
   pixBankName   String?
   pixHolderName String?
@@ -152,6 +154,7 @@ model Enrollment {
   participantPhone   String
   participantPosition String
   participantLevel   ParticipantLevel
+  isFemale           Boolean           @default(false)
   acceptedRules      Boolean
   pixPaid            Boolean           @default(false)
   notes              String?

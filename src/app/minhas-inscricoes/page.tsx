@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
 import { MyEnrollmentActions } from "@/components/my-enrollment-actions";
+import { UserProfileGenderCard } from "@/components/user-profile-gender-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,11 @@ export default async function MyEnrollmentsPage({
     redirect("/auth/signin?callbackUrl=/minhas-inscricoes");
   }
 
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { name: true, isFemale: true },
+  });
+
   const params = await searchParams;
   const enrollments = await prisma.enrollment.findMany({
     where: {
@@ -88,6 +94,11 @@ export default async function MyEnrollmentsPage({
       </div>
 
       <FlashMessage status={params.status} message={params.message} />
+
+      <UserProfileGenderCard
+        isFemale={currentUser?.isFemale ?? false}
+        userName={currentUser?.name}
+      />
 
       {enrollments.length === 0 ? (
         <EmptyState

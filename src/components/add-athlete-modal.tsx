@@ -17,6 +17,7 @@ import {
   positionOptionsFutebol,
   positionOptionsVolei,
 } from "@/lib/constants";
+import { detectIsFemaleByName } from "@/lib/gender";
 import { formatPhone } from "@/lib/utils";
 
 type AddAthleteModalProps = {
@@ -45,6 +46,8 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
   // Create state
   const [createName, setCreateName] = useState("");
   const [createPhone, setCreatePhone] = useState("");
+  const [createIsFemale, setCreateIsFemale] = useState(false);
+  const [isFemaleTouched, setIsFemaleTouched] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -399,11 +402,33 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                       <Input
                         autoFocus
                         name="participantName"
-                        onChange={(e) => setCreateName(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCreateName(val);
+                          if (!isFemaleTouched) {
+                            setCreateIsFemale(detectIsFemaleByName(val));
+                          }
+                        }}
                         placeholder="Nome do atleta"
                         required
                         value={createName}
                       />
+                    </label>
+
+                    <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-800 cursor-pointer">
+                      <input
+                        checked={createIsFemale}
+                        className="h-4 w-4 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
+                        name="isFemale"
+                        onChange={(e) => {
+                          setCreateIsFemale(e.target.checked);
+                          setIsFemaleTouched(true);
+                        }}
+                        type="checkbox"
+                      />
+                      <span className="text-xs font-semibold text-slate-800">
+                        Atleta do sexo feminino (Mulher)
+                      </span>
                     </label>
 
                     <label className="block space-y-1.5 text-sm font-medium text-slate-700">

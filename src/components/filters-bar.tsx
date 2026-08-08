@@ -26,17 +26,23 @@ export function FiltersBar({
   const [modality, setModality] = useState(defaultModality ?? "");
   const [visibility, setVisibility] = useState(defaultVisibility ?? "");
 
-  useEffect(() => {
+  const [prevQuery, setPrevQuery] = useState(defaultQuery);
+  if (prevQuery !== defaultQuery) {
+    setPrevQuery(defaultQuery);
     setQuery(defaultQuery ?? "");
-  }, [defaultQuery]);
+  }
 
-  useEffect(() => {
+  const [prevModality, setPrevModality] = useState(defaultModality);
+  if (prevModality !== defaultModality) {
+    setPrevModality(defaultModality);
     setModality(defaultModality ?? "");
-  }, [defaultModality]);
+  }
 
-  useEffect(() => {
+  const [prevVisibility, setPrevVisibility] = useState(defaultVisibility);
+  if (prevVisibility !== defaultVisibility) {
+    setPrevVisibility(defaultVisibility);
     setVisibility(defaultVisibility ?? "");
-  }, [defaultVisibility]);
+  }
 
   const applyFilters = () => {
     const params = new URLSearchParams();

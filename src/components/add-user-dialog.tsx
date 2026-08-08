@@ -8,15 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SubmitButton } from "@/components/submit-button";
+import { detectIsFemaleByName } from "@/lib/gender";
 
 export function AddUserDialog() {
   const [open, setOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [name, setName] = useState("");
+  const [isFemale, setIsFemale] = useState(false);
+  const [isFemaleTouched, setIsFemaleTouched] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +48,6 @@ export function AddUserDialog() {
       </Button>
 
       {open &&
-        isMounted &&
         createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div
@@ -83,7 +81,35 @@ export function AddUserDialog() {
               <form action={createOrganizerUserAction} className="mt-6 space-y-4">
                 <label className="block space-y-1.5 text-sm font-medium text-slate-700">
                   Nome*
-                  <Input name="name" placeholder="Nome completo" required />
+                  <Input
+                    name="name"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setName(val);
+                      if (!isFemaleTouched) {
+                        setIsFemale(detectIsFemaleByName(val));
+                      }
+                    }}
+                    placeholder="Nome completo"
+                    required
+                    value={name}
+                  />
+                </label>
+
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-800 cursor-pointer">
+                  <input
+                    checked={isFemale}
+                    className="h-4 w-4 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
+                    name="isFemale"
+                    onChange={(e) => {
+                      setIsFemale(e.target.checked);
+                      setIsFemaleTouched(true);
+                    }}
+                    type="checkbox"
+                  />
+                  <span className="text-xs font-semibold text-slate-800">
+                    Atleta do sexo feminino (Mulher)
+                  </span>
                 </label>
 
                 <label className="block space-y-1.5 text-sm font-medium text-slate-700">
