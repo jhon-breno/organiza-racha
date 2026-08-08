@@ -13,6 +13,8 @@ import { FlashMessage } from "@/components/flash-message";
 import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
+import { AddUserDialog } from "@/components/add-user-dialog";
+import { ShareRachaButton } from "@/components/share-racha-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -187,7 +189,10 @@ export default async function DashboardPage({
             Controle seus rachas, atletas, PIX e reembolsos.
           </h1>
         </div>
-        <NewRachaTypeDialog />
+        <div className="flex flex-wrap items-center gap-3">
+          <AddUserDialog />
+          <NewRachaTypeDialog />
+        </div>
       </div>
 
       <FlashMessage status={params.status} message={params.message} />
@@ -395,6 +400,7 @@ export default async function DashboardPage({
                   </div>
 
                   <div className="flex flex-wrap gap-3">
+                    <ShareRachaButton slug={racha.slug} title={racha.title} />
                     <Button
                       asChild
                       href={`/rachas/${racha.slug}`}

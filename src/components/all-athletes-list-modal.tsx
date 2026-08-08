@@ -72,7 +72,8 @@ function generateWhatsappMessage(
   slug: string,
 ): string {
   const dateStr = formatDateTimeShort(eventDate);
-  const inscriptionUrl = `https://organiza-racha.vercel.app/rachas/${slug}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://organiza-racha.vercel.app";
+  const inscriptionUrl = `${origin}/rachas/${slug}`;
 
   let message = `*${rachaTitle}* - Lista completa (${athleteLimit} Vagas)\n`;
   message += `Local: ${locationName}\n`;

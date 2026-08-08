@@ -4,6 +4,8 @@ import { MessageCircleIcon, Users } from "lucide-react";
 import { auth } from "@/auth";
 import { FlashMessage } from "@/components/flash-message";
 import { JoinRachaForm } from "@/components/join-racha-form";
+import { QuickJoinModal } from "@/components/quick-join-modal";
+import { ShareRachaButton } from "@/components/share-racha-button";
 import { MapPreview } from "@/components/map-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -230,6 +232,23 @@ export default async function RachaDetailsPage({
             </div>
 
             <div className="grid gap-3">
+              <ShareRachaButton slug={racha.slug} title={racha.title} />
+              <QuickJoinModal
+                hasEnrollment={Boolean(myEnrollment)}
+                isAuthenticated={Boolean(session?.user?.id)}
+                racha={{
+                  id: racha.id,
+                  slug: racha.slug,
+                  title: racha.title,
+                  modality: racha.modality,
+                  eventDate: racha.eventDate,
+                  locationName: racha.locationName,
+                  priceInCents: racha.priceInCents,
+                  athleteLimit: racha.athleteLimit,
+                  confirmedCount: confirmedPaidParticipants.length,
+                  visibility: racha.visibility,
+                }}
+              />
               {racha.phoneWhatsapp ? (
                 <Button
                   asChild
@@ -316,15 +335,17 @@ export default async function RachaDetailsPage({
               </p>
             </Card>
           ) : (
-            <JoinRachaForm
-              defaultParticipantName={
-                currentUserProfile?.name || session?.user?.name || ""
-              }
-              defaultParticipantPhone={currentUserProfile?.phone || ""}
-              isAuthenticated={Boolean(session?.user?.id)}
-              privateAccessGranted={hasPrivateAccess}
-              racha={racha}
-            />
+            <div id="join-racha-form">
+              <JoinRachaForm
+                defaultParticipantName={
+                  currentUserProfile?.name || session?.user?.name || ""
+                }
+                defaultParticipantPhone={currentUserProfile?.phone || ""}
+                isAuthenticated={Boolean(session?.user?.id)}
+                privateAccessGranted={hasPrivateAccess}
+                racha={racha}
+              />
+            </div>
           )}
 
           <Card className="space-y-4">

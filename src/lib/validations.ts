@@ -455,6 +455,16 @@ export const organizerDataSettingsSchema = z.object({
     .or(z.literal("")),
 });
 
+export const addOrganizerUserSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome completo."),
+  nickname: z.string().trim().optional().or(z.literal("")),
+  phone: z.string().trim().refine((val) => val.replace(/\D/g, "").length >= 10, {
+    message: "Informe o telefone com DDD e o 9 (ex: 85999469423).",
+  }),
+  email: z.string().trim().optional().or(z.literal("")),
+  password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
+});
+
 export const organizerPixSettingsSchema = z.object({
   pixKey: z
     .string()

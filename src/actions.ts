@@ -24,6 +24,7 @@ import {
   combineDateAndTime,
   credentialsSignInSchema,
   enrollmentSchema,
+  addOrganizerUserSchema,
   forgotPasswordSchema,
   organizerDataSettingsSchema,
   organizerAddRachaAdminSchema,
@@ -1002,6 +1003,91 @@ export async function updateOrganizerDataSettingsAction(formData: FormData) {
       "/dashboard",
       "success",
       "Configurações de dados atualizadas com sucesso.",
+    ),
+  );
+}
+
+export async function createOrganizerUserAction(formData: FormData) {
+  await requireUser("/dashboard");
+
+  const parsed = addOrganizerUserSchema.safeParse({
+    name: getStringValue(formData, "name"),
+    nickname: getStringValue(formData, "nickname"),
+    phone: getStringValue(formData, "phone"),
+    email: getStringValue(formData, "email"),
+    password: getStringValue(formData, "password"),
+  });
+
+  if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        parsed.error.issues[0]?.message ?? "Preencha os dados do usuário corretamente.",
+        { field },
+      ),
+    );
+  }
+
+  const phone = normalizePhoneValue(parsed.data.phone);
+  const email = parsed.data.email ? normalizeEmailValue(parsed.data.email) : null;
+  const canUseNickname = supportsUserField("nickname");
+
+  if (email) {
+    const existingEmail = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (existingEmail) {
+      redirect(
+        buildMessageUrl(
+          "/dashboard",
+          "error",
+          "Já existe um usuário cadastrado com este e-mail.",
+        ),
+      );
+    }
+  }
+
+  const existingPhone = await prisma.user.findFirst({
+    where: { phone },
+    select: { id: true },
+  });
+  if (existingPhone) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        "Já existe um usuário cadastrado com este telefone.",
+      ),
+    );
+  }
+
+  const passwordHash = await hash(parsed.data.password, 10);
+
+  const createData: Record<string, unknown> = {
+    name: parsed.data.name,
+    phone,
+    email,
+    passwordHash,
+  };
+
+  if (canUseNickname && parsed.data.nickname) {
+    createData.nickname = parsed.data.nickname;
+  }
+
+  await prisma.user.create({
+    data: createData as any,
+  });
+
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      "/dashboard",
+      "success",
+      `Usuário ${parsed.data.name} adicionado ao banco com sucesso!`,
     ),
   );
 }

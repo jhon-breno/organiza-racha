@@ -82,6 +82,11 @@ const providers = [
 ];
 
 const authResult = NextAuth({
+  secret:
+    process.env.AUTH_SECRET ??
+    process.env.NEXTAUTH_SECRET ??
+    "organiza-racha-secret-key-fallback-2026",
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   pages: {
     signIn: "/auth/signin",
