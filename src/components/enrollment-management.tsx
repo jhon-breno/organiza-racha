@@ -244,12 +244,14 @@ export function EnrollmentManagement({
           </div>
         </div>
 
-        <form action={cancelPendingPaymentEnrollmentsAction}>
-          <input name="rachaId" type="hidden" value={rachaId} />
-          <SubmitButton pendingLabel="Cancelando..." size="sm" variant="danger">
-            Cancelar Inscrições Pendentes Pagamento.
-          </SubmitButton>
-        </form>
+        {Boolean(priceInCents && priceInCents > 0) && (
+          <form action={cancelPendingPaymentEnrollmentsAction}>
+            <input name="rachaId" type="hidden" value={rachaId} />
+            <SubmitButton pendingLabel="Cancelando..." size="sm" variant="danger">
+              Cancelar Inscrições Pendentes Pagamento.
+            </SubmitButton>
+          </form>
+        )}
 
         <p className="text-xs text-slate-500">
           {filteredEnrollments.length} de {enrollments.length} participante(s)
