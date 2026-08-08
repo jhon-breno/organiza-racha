@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Enrollment, ParticipantStatus, Racha } from "@prisma/client";
+
+type EnrollmentWithNickname = Enrollment & {
+  user: { nickname: string | null };
+};
 import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
 import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
@@ -25,7 +29,7 @@ import {
 } from "@/lib/utils";
 
 type RachaWithEnrollments = Racha & {
-  enrollments: Enrollment[];
+  enrollments: EnrollmentWithNickname[];
 };
 
 type DashboardRachaListProps = {
@@ -175,8 +179,8 @@ export function DashboardRachaList({
                       {racha.title}
                     </h2>
                     <p className="text-sm text-slate-600">
-                      {formatDateTimeShort(racha.eventDate, racha.eventEndDate)} •{" "}
-                      {racha.locationName} •{" "}
+                      {formatDateTimeShort(racha.eventDate, racha.eventEndDate)}{" "}
+                      • {racha.locationName} •{" "}
                       {formatCurrencyFromCents(racha.priceInCents)}
                     </p>
                     {!racha.pixKey.trim() ? (
@@ -216,6 +220,7 @@ export function DashboardRachaList({
                         enrollments={confirmedEnrollments.map((item) => ({
                           id: item.id,
                           participantName: item.participantName,
+                          participantNickname: item.user?.nickname ?? null,
                           participantPhone: item.participantPhone,
                           participantPosition: item.participantPosition,
                           participantLevel: item.participantLevel,
@@ -267,6 +272,7 @@ export function DashboardRachaList({
                           id: item.id,
                           createdAt: item.createdAt,
                           participantName: item.participantName,
+                          participantNickname: item.user?.nickname ?? null,
                           participantPhone: item.participantPhone,
                           participantPosition: item.participantPosition,
                           participantLevel: item.participantLevel,

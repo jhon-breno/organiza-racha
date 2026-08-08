@@ -257,6 +257,13 @@ export function getPrivateRachaAccessCookieName(rachaId: string) {
   return `private-racha-access-${rachaId}`;
 }
 
+export function getDisplayName(
+  participantName: string,
+  participantNickname?: string | null,
+): string {
+  return participantNickname?.trim() || participantName;
+}
+
 export function getRachaCoverImageUrl(
   modality: string,
   coverImageUrl?: string | null,

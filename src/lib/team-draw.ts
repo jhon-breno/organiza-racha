@@ -1,11 +1,12 @@
 import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { detectIsFemaleByName } from "@/lib/gender";
 import { getParticipantLevelScore } from "@/lib/participant-level";
-import { formatDateTimeShort } from "@/lib/utils";
+import { formatDateTimeShort, getDisplayName } from "@/lib/utils";
 
 export type TeamDrawParticipant = {
   id: string;
   participantName: string;
+  participantNickname?: string | null;
   participantPosition: string;
   participantLevel: string;
   isFemale?: boolean;
@@ -71,8 +72,9 @@ function buildTargetSizes(totalPlayers: number, teamCount: number) {
   const baseSize = Math.floor(totalPlayers / teamCount);
   const remainder = totalPlayers % teamCount;
 
-  return Array.from({ length: teamCount }, (_, index) =>
-    baseSize + (index < remainder ? 1 : 0),
+  return Array.from(
+    { length: teamCount },
+    (_, index) => baseSize + (index < remainder ? 1 : 0),
   );
 }
 
@@ -124,7 +126,9 @@ export function getSuggestedTeamCount(input: {
 }) {
   const playersPerTeam = getSuggestedPlayersPerTeam(input);
   const effectiveCount =
-    input.modality === "FUTEBOL" ? input.linePlayerCount : input.participantCount;
+    input.modality === "FUTEBOL"
+      ? input.linePlayerCount
+      : input.participantCount;
 
   if (effectiveCount <= 1) {
     return 2;
@@ -199,12 +203,17 @@ export function drawBalancedTeams({
     const targetTeam = teams[index % teams.length];
     if (targetTeam) {
       targetTeam.setters.push(setter);
-      targetTeam.totalScore += getParticipantLevelScore(setter.participantLevel);
+      targetTeam.totalScore += getParticipantLevelScore(
+        setter.participantLevel,
+      );
     }
   });
 
   // Distribute Female Players evenly across teams to balance mixed teams
-  const shuffledFemalePlayers = shuffleSameScoreGroups(femalePlayers, seed + 509);
+  const shuffledFemalePlayers = shuffleSameScoreGroups(
+    femalePlayers,
+    seed + 509,
+  );
   shuffledFemalePlayers.forEach((femalePlayer) => {
     const score = getParticipantLevelScore(femalePlayer.participantLevel);
 
@@ -319,7 +328,11 @@ export function buildTeamDrawMessage(
       team.setters.forEach((setter) => {
         const isFemale =
           setter.isFemale ?? detectIsFemaleByName(setter.participantName);
-        message += `${playerNum}. ${setter.participantName} (Levantador)${isFemale ? " 👩" : ""}\n`;
+        const name = getDisplayName(
+          setter.participantName,
+          setter.participantNickname,
+        );
+        message += `${playerNum}. ${name} (Levantador)${isFemale ? " 👩" : ""}\n`;
         playerNum += 1;
       });
     }
@@ -327,13 +340,22 @@ export function buildTeamDrawMessage(
     team.players.forEach((player) => {
       const isFemale =
         player.isFemale ?? detectIsFemaleByName(player.participantName);
-      message += `${playerNum}. ${player.participantName}${isFemale ? " 👩" : ""}\n`;
+      const name = getDisplayName(
+        player.participantName,
+        player.participantNickname,
+      );
+      message += `${playerNum}. ${name}${isFemale ? " 👩" : ""}\n`;
       playerNum += 1;
     });
 
     if (team.goalkeepers.length > 0) {
       message += `Goleiro(s): ${team.goalkeepers
-        .map((goalkeeper) => goalkeeper.participantName)
+        .map((goalkeeper) =>
+          getDisplayName(
+            goalkeeper.participantName,
+            goalkeeper.participantNickname,
+          ),
+        )
         .join(", ")}\n`;
     }
 

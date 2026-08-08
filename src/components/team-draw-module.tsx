@@ -18,7 +18,7 @@ import {
   getParticipantLevelLabel,
   getParticipantLevelVisual,
 } from "@/lib/participant-level";
-import { formatDateTimeShort } from "@/lib/utils";
+import { formatDateTimeShort, getDisplayName } from "@/lib/utils";
 
 type TeamDrawModuleProps = {
   rachaTitle: string;
@@ -104,9 +104,12 @@ export function TeamDrawModule({
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      setRevealedTeamCount((current) => current + 1);
-    }, revealedTeamCount === 0 ? INITIAL_DRAW_DELAY_MS : TEAM_REVEAL_DELAY_MS);
+    const timeout = window.setTimeout(
+      () => {
+        setRevealedTeamCount((current) => current + 1);
+      },
+      revealedTeamCount === 0 ? INITIAL_DRAW_DELAY_MS : TEAM_REVEAL_DELAY_MS,
+    );
 
     return () => window.clearTimeout(timeout);
   }, [isDrawing, revealedTeamCount, teams.length]);
@@ -203,11 +206,14 @@ export function TeamDrawModule({
             Base do sorteio
           </h3>
           <p className="mt-2 text-sm text-slate-600">
-            Revise os atletas confirmados e seus niveis antes de realizar o sorteio.
+            Revise os atletas confirmados e seus niveis antes de realizar o
+            sorteio.
           </p>
           <p className="mt-2 text-xs text-slate-500">
             {linePlayers.length} atletas de linha confirmados
-            {goalkeepers.length > 0 ? ` • ${goalkeepers.length} goleiro(s)` : ""}
+            {goalkeepers.length > 0
+              ? ` • ${goalkeepers.length} goleiro(s)`
+              : ""}
           </p>
         </div>
 
@@ -219,7 +225,11 @@ export function TeamDrawModule({
             >
               <div>
                 <p className="text-sm font-semibold text-slate-950">
-                  {index + 1}. {participant.participantName}
+                  {index + 1}.{" "}
+                  {getDisplayName(
+                    participant.participantName,
+                    participant.participantNickname,
+                  )}
                 </p>
                 <p className="text-xs text-slate-500">
                   {participant.participantPosition}
@@ -246,7 +256,8 @@ export function TeamDrawModule({
               Distribuicao equilibrada por estrelas
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              O sistema monta times balanceados e revela um por vez, como se o sorteio estivesse acontecendo agora.
+              O sistema monta times balanceados e revela um por vez, como se o
+              sorteio estivesse acontecendo agora.
             </p>
             <p className="mt-2 text-xs text-slate-500">
               Sugestao automatica: {suggestedTeamCount} time(s)
@@ -280,7 +291,11 @@ export function TeamDrawModule({
               {drawnAt ? "Realizar novo sorteio" : "Realizar sorteio agora"}
             </Button>
 
-            <Button onClick={handleWhatsappExport} type="button" variant="outline">
+            <Button
+              onClick={handleWhatsappExport}
+              type="button"
+              variant="outline"
+            >
               <MessageCircle className="h-4 w-4" />
               Exportar para WhatsApp
             </Button>
@@ -298,7 +313,8 @@ export function TeamDrawModule({
               Aguardando sorteio
             </p>
             <p className="mt-3 text-base text-slate-700">
-              Clique em <strong>Realizar sorteio agora</strong> para revelar os times.
+              Clique em <strong>Realizar sorteio agora</strong> para revelar os
+              times.
             </p>
           </div>
         ) : null}
@@ -325,7 +341,8 @@ export function TeamDrawModule({
               <div className="mt-5 flex items-center justify-center gap-3 text-sm font-semibold text-slate-700">
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <span>
-                  {Math.min(revealedTeamCount, teams.length)} de {teams.length} time(s)
+                  {Math.min(revealedTeamCount, teams.length)} de {teams.length}{" "}
+                  time(s)
                 </span>
               </div>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-200">
@@ -352,7 +369,11 @@ export function TeamDrawModule({
                 Copiar mensagem
               </Button>
 
-              <Button onClick={handleOpenWhatsapp} className="flex-1" type="button">
+              <Button
+                onClick={handleOpenWhatsapp}
+                className="flex-1"
+                type="button"
+              >
                 <MessageCircle className="h-4 w-4" />
                 Abrir WhatsApp
               </Button>
@@ -389,11 +410,18 @@ export function TeamDrawModule({
                     <>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h4 className="text-lg font-bold text-slate-950">{team.name}</h4>
-                          <p className="text-xs text-slate-500">{team.totalScore} pontos totais</p>
+                          <h4 className="text-lg font-bold text-slate-950">
+                            {team.name}
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            {team.totalScore} pontos totais
+                          </p>
                         </div>
                         <div className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                          {team.players.length + team.setters.length + team.goalkeepers.length} atletas
+                          {team.players.length +
+                            team.setters.length +
+                            team.goalkeepers.length}{" "}
+                          atletas
                         </div>
                       </div>
 
@@ -421,7 +449,9 @@ export function TeamDrawModule({
                                     ) : null}
                                   </span>
                                   <span className="text-xs text-amber-700">
-                                    {getParticipantLevelVisual(setter.participantLevel)}
+                                    {getParticipantLevelVisual(
+                                      setter.participantLevel,
+                                    )}
                                   </span>
                                 </div>
                               );
@@ -445,7 +475,8 @@ export function TeamDrawModule({
                                 <div>
                                   <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-950">
                                     <span>
-                                      {participantIndex + 1}. {participant.participantName}
+                                      {participantIndex + 1}.{" "}
+                                      {participant.participantName}
                                     </span>
                                     {isFemale ? (
                                       <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
@@ -459,9 +490,15 @@ export function TeamDrawModule({
                                 </div>
                                 <div className="text-right text-xs text-amber-700">
                                   <p className="font-semibold">
-                                    {getParticipantLevelVisual(participant.participantLevel)}
+                                    {getParticipantLevelVisual(
+                                      participant.participantLevel,
+                                    )}
                                   </p>
-                                  <p>{getParticipantLevelLabel(participant.participantLevel)}</p>
+                                  <p>
+                                    {getParticipantLevelLabel(
+                                      participant.participantLevel,
+                                    )}
+                                  </p>
                                 </div>
                               </div>
                             </div>
@@ -482,7 +519,9 @@ export function TeamDrawModule({
                               >
                                 <span>{goalkeeper.participantName}</span>
                                 <span className="text-xs text-amber-700">
-                                  {getParticipantLevelVisual(goalkeeper.participantLevel)}
+                                  {getParticipantLevelVisual(
+                                    goalkeeper.participantLevel,
+                                  )}
                                 </span>
                               </div>
                             ))}

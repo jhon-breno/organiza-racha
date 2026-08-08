@@ -11,11 +11,12 @@ import {
   isConfirmedEnrollment,
   isGoalkeeperEnrollment,
 } from "@/lib/enrollment";
-import { formatDateTimeShort, formatPhone } from "@/lib/utils";
+import { formatDateTimeShort, formatPhone, getDisplayName } from "@/lib/utils";
 
 type ExportableEnrollment = {
   id: string;
   participantName: string;
+  participantNickname?: string | null;
   participantPhone: string;
   participantPosition: string;
   participantLevel: string;
@@ -65,7 +66,7 @@ function generateWhatsappMessage(
   for (let i = 0; i < athleteLimit; i++) {
     if (i < lineEnrollments.length) {
       const status = getUnifiedStatus(lineEnrollments[i]!, priceInCents);
-      message += `${i + 1} - ${lineEnrollments[i]!.participantName} (${status})\n`;
+      message += `${i + 1} - ${getDisplayName(lineEnrollments[i]!.participantName, lineEnrollments[i]!.participantNickname)} (${status})\n`;
     } else {
       message += `${i + 1} - \n`;
     }
@@ -81,8 +82,7 @@ function generateWhatsappMessage(
 
     for (let i = 0; i < goalkeeperSlots; i++) {
       if (i < goalkeeperEnrollments.length) {
-        message += `${i + 1} - ${goalkeeperEnrollments[i]!.participantName}\n`;
-      } else {
+        message += `${i + 1} - ${getDisplayName(goalkeeperEnrollments[i]!.participantName, goalkeeperEnrollments[i]!.participantNickname)}\n`; else {
         message += `${i + 1} - \n`;
       }
     }
@@ -286,7 +286,7 @@ export function ConfirmedListModal({
                         >
                           <div className="flex-1 space-y-1">
                             <p className="text-sm font-bold text-slate-950">
-                              {index + 1}. {enrollment.participantName}
+                              {index + 1}. {getDisplayName(enrollment.participantName, enrollment.participantNickname)}
                             </p>
                             <p className="text-xs text-slate-600">
                               {formatPhone(enrollment.participantPhone)} •{" "}
@@ -313,7 +313,7 @@ export function ConfirmedListModal({
                               >
                                 <div className="flex-1 space-y-1">
                                   <p className="text-sm font-bold text-slate-950">
-                                    {index + 1}. {enrollment.participantName}
+                                    {index + 1}. {getDisplayName(enrollment.participantName, enrollment.participantNickname)}
                                   </p>
                                   <p className="text-xs text-slate-600">
                                     {formatPhone(enrollment.participantPhone)} •{" "}

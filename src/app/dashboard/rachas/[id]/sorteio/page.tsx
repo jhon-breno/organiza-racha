@@ -25,6 +25,9 @@ export default async function RachaTeamDrawPage({
     include: {
       enrollments: {
         orderBy: [{ createdAt: "asc" }],
+        include: {
+          user: { select: { nickname: true } },
+        },
       },
     },
   });
@@ -52,6 +55,7 @@ export default async function RachaTeamDrawPage({
     .map((item) => ({
       id: item.id,
       participantName: item.participantName,
+      participantNickname: item.user?.nickname ?? null,
       participantPhone: item.participantPhone,
       participantPosition: item.participantPosition,
       participantLevel: item.participantLevel,

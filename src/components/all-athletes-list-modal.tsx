@@ -14,12 +14,13 @@ import {
   isGoalkeeperEnrollment,
   isVisibleEnrollment,
 } from "@/lib/enrollment";
-import { formatDateTimeShort, formatPhone } from "@/lib/utils";
+import { formatDateTimeShort, formatPhone, getDisplayName } from "@/lib/utils";
 
 type AllAthleteEnrollment = {
   id: string;
   createdAt: Date | string;
   participantName: string;
+  participantNickname?: string | null;
   participantPhone: string;
   participantPosition: string;
   participantLevel: string;
@@ -72,7 +73,10 @@ function generateWhatsappMessage(
   slug: string,
 ): string {
   const dateStr = formatDateTimeShort(eventDate);
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://organiza-racha.vercel.app";
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://organiza-racha.vercel.app";
   const inscriptionUrl = `${origin}/rachas/${slug}`;
 
   let message = `*${rachaTitle}* - Lista completa (${athleteLimit} Vagas)\n`;
@@ -89,7 +93,7 @@ function generateWhatsappMessage(
       continue;
     }
 
-    message += `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+    message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${getEnrollmentStatusEmoji(enrollment)}\n`;
   }
 
   const goalkeeperSlots = Math.max(
@@ -108,7 +112,7 @@ function generateWhatsappMessage(
         continue;
       }
 
-      message += `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+      message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${getEnrollmentStatusEmoji(enrollment)}\n`;
     }
   }
 
@@ -117,7 +121,7 @@ function generateWhatsappMessage(
 
     for (let index = 0; index < waitlistEnrollments.length; index += 1) {
       const enrollment = waitlistEnrollments[index]!;
-      message += `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+      message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${getEnrollmentStatusEmoji(enrollment)}\n`;
     }
   }
 
@@ -368,7 +372,11 @@ export function AllAthletesListModal({
                           >
                             <div className="flex-1 space-y-1">
                               <p className="text-sm font-bold text-slate-950">
-                                {index + 1}. {enrollment.participantName}
+                                {index + 1}.{" "}
+                                {getDisplayName(
+                                  enrollment.participantName,
+                                  enrollment.participantNickname,
+                                )}
                               </p>
                               <p className="text-xs text-slate-600">
                                 {formatPhone(enrollment.participantPhone)} •{" "}
@@ -401,7 +409,11 @@ export function AllAthletesListModal({
                                 >
                                   <div className="flex-1 space-y-1">
                                     <p className="text-sm font-bold text-slate-950">
-                                      {index + 1}. {enrollment.participantName}
+                                      {index + 1}.{" "}
+                                      {getDisplayName(
+                                        enrollment.participantName,
+                                        enrollment.participantNickname,
+                                      )}
                                     </p>
                                     <p className="text-xs text-slate-600">
                                       {enrollment.participantPhone} •{" "}
@@ -436,7 +448,11 @@ export function AllAthletesListModal({
                                 >
                                   <div className="flex-1 space-y-1">
                                     <p className="text-sm font-bold text-slate-950">
-                                      {index + 1}. {enrollment.participantName}
+                                      {index + 1}.{" "}
+                                      {getDisplayName(
+                                        enrollment.participantName,
+                                        enrollment.participantNickname,
+                                      )}
                                     </p>
                                     <p className="text-xs text-slate-600">
                                       {formatPhone(enrollment.participantPhone)}{" "}

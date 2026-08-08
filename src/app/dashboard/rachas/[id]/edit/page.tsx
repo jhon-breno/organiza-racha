@@ -56,6 +56,9 @@ export default async function EditRachaPage({
       },
       enrollments: {
         orderBy: [{ createdAt: "asc" }],
+        include: {
+          user: { select: { nickname: true } },
+        },
       },
       rachaAdmins: {
         include: {
@@ -129,6 +132,7 @@ export default async function EditRachaPage({
       id: item.id,
       createdAt: item.createdAt,
       participantName: item.participantName,
+      participantNickname: item.user?.nickname ?? null,
       participantPhone: item.participantPhone,
       participantPosition: item.participantPosition,
       participantLevel: item.participantLevel,
@@ -210,6 +214,7 @@ export default async function EditRachaPage({
                 enrollments={confirmedEnrollments.map((item) => ({
                   id: item.id,
                   participantName: item.participantName,
+                  participantNickname: item.user?.nickname ?? null,
                   participantPhone: item.participantPhone,
                   participantPosition: item.participantPosition,
                   participantLevel: item.participantLevel,
@@ -276,6 +281,7 @@ export default async function EditRachaPage({
                   id: item.id,
                   createdAt: item.createdAt,
                   participantName: item.participantName,
+                  participantNickname: item.user?.nickname ?? null,
                   participantPhone: item.participantPhone,
                   participantPosition: item.participantPosition,
                   participantLevel: item.participantLevel,

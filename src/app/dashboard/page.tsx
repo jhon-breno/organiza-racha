@@ -143,7 +143,11 @@ export default async function DashboardPage({
       ],
     },
     include: {
-      enrollments: true,
+      enrollments: {
+        include: {
+          user: { select: { nickname: true } },
+        },
+      },
     },
     orderBy: [{ eventDate: "desc" }],
   });

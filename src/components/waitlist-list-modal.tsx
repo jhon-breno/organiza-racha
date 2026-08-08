@@ -11,12 +11,13 @@ import {
   compareEnrollmentsForExport,
   getEnrollmentStatusLabel,
 } from "@/lib/enrollment";
-import { formatDateTimeShort, formatPhone } from "@/lib/utils";
+import { formatDateTimeShort, formatPhone, getDisplayName } from "@/lib/utils";
 
 type WaitlistEnrollment = {
   id: string;
   createdAt: Date | string;
   participantName: string;
+  participantNickname?: string | null;
   participantPhone: string;
   participantPosition: string;
   participantLevel: string;
@@ -53,7 +54,7 @@ function generateWhatsappMessage(
 
   for (let index = 0; index < enrollments.length; index += 1) {
     const enrollment = enrollments[index]!;
-    message += `${index + 1} - ${enrollment.participantName} (${getEnrollmentStatusLabel(enrollment)})\n`;
+    message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} (${getEnrollmentStatusLabel(enrollment)})\n`;
   }
 
   return message;
@@ -210,7 +211,11 @@ export function WaitlistListModal({
                       >
                         <div className="flex-1 space-y-1">
                           <p className="text-sm font-bold text-slate-950">
-                            {index + 1}. {enrollment.participantName}
+                            {index + 1}.{" "}
+                            {getDisplayName(
+                              enrollment.participantName,
+                              enrollment.participantNickname,
+                            )}
                           </p>
                           <p className="text-xs text-slate-600">
                             {formatPhone(enrollment.participantPhone)} •{" "}
