@@ -82,7 +82,8 @@ function generateWhatsappMessage(
 
     for (let i = 0; i < goalkeeperSlots; i++) {
       if (i < goalkeeperEnrollments.length) {
-        message += `${i + 1} - ${getDisplayName(goalkeeperEnrollments[i]!.participantName, goalkeeperEnrollments[i]!.participantNickname)}\n`; else {
+        message += `${i + 1} - ${getDisplayName(goalkeeperEnrollments[i]!.participantName, goalkeeperEnrollments[i]!.participantNickname)}\n`;
+      } else {
         message += `${i + 1} - \n`;
       }
     }
@@ -286,7 +287,11 @@ export function ConfirmedListModal({
                         >
                           <div className="flex-1 space-y-1">
                             <p className="text-sm font-bold text-slate-950">
-                              {index + 1}. {getDisplayName(enrollment.participantName, enrollment.participantNickname)}
+                              {index + 1}.{" "}
+                              {getDisplayName(
+                                enrollment.participantName,
+                                enrollment.participantNickname,
+                              )}
                             </p>
                             <p className="text-xs text-slate-600">
                               {formatPhone(enrollment.participantPhone)} •{" "}
@@ -313,7 +318,11 @@ export function ConfirmedListModal({
                               >
                                 <div className="flex-1 space-y-1">
                                   <p className="text-sm font-bold text-slate-950">
-                                    {index + 1}. {getDisplayName(enrollment.participantName, enrollment.participantNickname)}
+                                    {index + 1}.{" "}
+                                    {getDisplayName(
+                                      enrollment.participantName,
+                                      enrollment.participantNickname,
+                                    )}
                                   </p>
                                   <p className="text-xs text-slate-600">
                                     {formatPhone(enrollment.participantPhone)} •{" "}
