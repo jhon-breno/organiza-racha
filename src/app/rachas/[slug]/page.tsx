@@ -83,6 +83,11 @@ export default async function RachaDetailsPage({
   const myEnrollment = session?.user?.id
     ? racha.enrollments.find(visibleEnrollmentForUser)
     : null;
+  const isOrganizer = session?.user?.id === racha.organizerId;
+  const canViewAthletesList =
+    hasPrivateAccess &&
+    Boolean(session?.user?.id) &&
+    (Boolean(myEnrollment) || isOrganizer);
   const currentUserProfile = session?.user?.id
     ? await prisma.user.findUnique({
         where: { id: session.user.id },
@@ -363,7 +368,7 @@ export default async function RachaDetailsPage({
           </Card>
         </div>
 
-        {hasPrivateAccess ? (
+        {canViewAthletesList ? (
           <div className="xl:col-start-1">
             <Card className="space-y-4">
               <div className="flex items-center justify-between gap-4">
