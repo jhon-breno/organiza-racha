@@ -28,6 +28,17 @@ function getExportTypeLabel(type: string) {
   return "Todos os atletas";
 }
 
+function formatExportParticipantName(input: {
+  participantName: string;
+  participantPosition?: string | null;
+}) {
+  if (input.participantPosition?.trim().toLowerCase() === "levantador") {
+    return `L ${input.participantName}`;
+  }
+
+  return input.participantName;
+}
+
 function getExportStatusMarker(enrollment: Enrollment, priceInCents: number) {
   const emoji = getEnrollmentStatusEmoji(enrollment);
 
@@ -158,7 +169,7 @@ function generateExcel(
     ? waitlistEnrollments.map((enrollment, index) => [
         "Lista de espera",
         (index + 1).toString(),
-        enrollment.participantName,
+        formatExportParticipantName(enrollment),
         enrollment.participantPhone,
         enrollment.participantPosition,
         levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
@@ -172,7 +183,7 @@ function generateExcel(
           return [
             "Atleta",
             (index + 1).toString(),
-            enrollment?.participantName ?? "",
+            enrollment ? formatExportParticipantName(enrollment) : "",
             enrollment?.participantPhone ?? "",
             enrollment?.participantPosition ?? "",
             enrollment
@@ -189,7 +200,7 @@ function generateExcel(
           return [
             "Goleiro",
             (index + 1).toString(),
-            enrollment?.participantName ?? "",
+            enrollment ? formatExportParticipantName(enrollment) : "",
             enrollment?.participantPhone ?? "",
             enrollment?.participantPosition ?? "Goleiro",
             enrollment
@@ -204,7 +215,7 @@ function generateExcel(
           ? waitlistEnrollments.map((enrollment, index) => [
               "Lista de espera",
               (index + 1).toString(),
-              enrollment.participantName,
+              formatExportParticipantName(enrollment),
               enrollment.participantPhone,
               enrollment.participantPosition,
               levelLabels[
@@ -288,10 +299,11 @@ async function generatePDF(
 
   const buildLineWithStatusMarker = (index: number, enrollment: Enrollment) => {
     const marker = getExportStatusMarker(enrollment, racha.priceInCents);
+    const participantName = formatExportParticipantName(enrollment);
 
     return marker
-      ? `${index + 1} - ${enrollment.participantName} ${marker}`
-      : `${index + 1} - ${enrollment.participantName}`;
+      ? `${index + 1} - ${participantName} ${marker}`
+      : `${index + 1} - ${participantName}`;
   };
 
   const ensureSpace = (needed = 56) => {

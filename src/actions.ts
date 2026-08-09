@@ -462,6 +462,73 @@ async function createOrganizerEnrollmentForRacha(input: {
   };
 }
 
+async function promoteWaitlistEnrollmentsIfSlotsAvailable(rachaId: string) {
+  const racha = await prisma.racha.findUnique({
+    where: { id: rachaId },
+    select: { athleteLimit: true },
+  });
+
+  if (!racha) {
+    return 0;
+  }
+
+  const activeLineCount = await prisma.enrollment.count({
+    where: {
+      rachaId,
+      status: ParticipantStatus.ACTIVE,
+      participantPosition: {
+        not: "Goleiro",
+      },
+    },
+  });
+
+  const availableSlots = racha.athleteLimit - activeLineCount;
+
+  if (availableSlots <= 0) {
+    return 0;
+  }
+
+  const waitlistCandidates = await prisma.enrollment.findMany({
+    where: {
+      rachaId,
+      status: ParticipantStatus.WAITLIST,
+      paymentStatus: {
+        not: PaymentStatus.REFUNDED,
+      },
+    },
+    orderBy: [{ createdAt: "asc" }],
+    select: {
+      id: true,
+      participantPosition: true,
+    },
+  });
+
+  const promotionIds = waitlistCandidates
+    .filter(
+      (enrollment) => !isGoalkeeperPosition(enrollment.participantPosition),
+    )
+    .slice(0, availableSlots)
+    .map((enrollment) => enrollment.id);
+
+  if (!promotionIds.length) {
+    return 0;
+  }
+
+  const result = await prisma.enrollment.updateMany({
+    where: {
+      id: {
+        in: promotionIds,
+      },
+    },
+    data: {
+      status: ParticipantStatus.ACTIVE,
+      canceledAt: null,
+    },
+  });
+
+  return result.count;
+}
+
 type ValidatePrivateAccessKeyState = {
   success: boolean;
   message?: string;
@@ -2001,6 +2068,7 @@ export async function searchUsersByPhoneAction(query: string) {
 
   const ORConditions: Prisma.UserWhereInput[] = [
     { name: { contains: rawQuery, mode: "insensitive" } },
+    { nickname: { contains: rawQuery, mode: "insensitive" } },
   ];
 
   if (digits.length >= 2) {
@@ -2014,6 +2082,7 @@ export async function searchUsersByPhoneAction(query: string) {
     select: {
       id: true,
       name: true,
+      nickname: true,
       phone: true,
     },
     take: 10,
@@ -2025,6 +2094,7 @@ export async function searchUsersByPhoneAction(query: string) {
   return users.map((u) => ({
     id: u.id,
     name: u.name || "Sem nome",
+    nickname: u.nickname || "",
     phone: u.phone || "",
   }));
 }
@@ -2415,6 +2485,8 @@ export async function updateOrganizerEnrollmentStatusAction(
     }),
   });
 
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
+
   const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
 
   revalidatePath(callbackUrl);
@@ -2514,6 +2586,8 @@ export async function cancelPendingPaymentEnrollmentsAction(
     },
   });
 
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(racha.id);
+
   revalidatePath(callbackUrl);
   revalidatePath(`/rachas/${racha.slug}`);
   revalidatePath("/dashboard");
@@ -2593,6 +2667,8 @@ export async function removeOrganizerEnrollmentAction(formData: FormData) {
         `${enrollment.notes ?? ""}\n\n[Remoção pelo organizador]\nParticipante removido da lista do racha.`.trim(),
     },
   });
+
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
 
   const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
 
@@ -2802,6 +2878,8 @@ export async function cancelEnrollmentAction(formData: FormData) {
     },
   });
 
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
+
   revalidatePath("/minhas-inscricoes");
   revalidatePath(`/rachas/${enrollment.racha.slug}`);
   revalidatePath(`/dashboard/rachas/${enrollment.rachaId}/edit`);
@@ -2868,6 +2946,8 @@ export async function cancelPendingEnrollmentAction(formData: FormData) {
         `${enrollment.notes ?? ""}\n\n[Cancelamento sem pagamento]\nMotivo: ${parsed.data.cancelReason}`.trim(),
     },
   });
+
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
 
   revalidatePath("/minhas-inscricoes");
   revalidatePath(`/rachas/${enrollment.rachaId}`);
@@ -2988,6 +3068,8 @@ export async function removeOrganizerPendingEnrollmentAction(
     },
   });
 
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
+
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/rachas/${enrollment.rachaId}/edit`);
   revalidatePath(`/rachas/${enrollment.racha.slug}`);
@@ -3033,6 +3115,8 @@ export async function markEnrollmentRefundedAction(formData: FormData) {
       paymentStatus: PaymentStatus.REFUNDED,
     },
   });
+
+  await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
 
   revalidatePath("/dashboard");
   revalidatePath("/minhas-inscricoes");

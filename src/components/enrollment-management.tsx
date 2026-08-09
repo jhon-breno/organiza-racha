@@ -113,6 +113,7 @@ export function EnrollmentManagement({
   enrollments: {
     id: string;
     participantName: string;
+    participantNickname?: string | null;
     participantPhone: string;
     participantPosition: string;
     participantLevel: string;
@@ -140,6 +141,7 @@ export function EnrollmentManagement({
     return enrollments.filter((enrollment) =>
       [
         enrollment.participantName,
+        enrollment.participantNickname ?? "",
         enrollment.participantPhone,
         enrollment.participantPosition,
         levelLabels[enrollment.participantLevel] ?? enrollment.participantLevel,
@@ -231,15 +233,15 @@ export function EnrollmentManagement({
               Localizar participante
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Busque por nome, telefone, posição ou nível para encontrar mais
-              rápido.
+              Busque por nome, apelido, telefone, posição ou nível para
+              encontrar mais rápido.
             </p>
           </div>
 
           <div className="w-full max-w-md">
             <Input
               onChange={(event) => setParticipantSearch(event.target.value)}
-              placeholder="Ex.: João, 8599..., Atacante"
+              placeholder="Ex.: João, Juninho, 8599..., Atacante"
               value={participantSearch}
             />
           </div>
@@ -248,7 +250,11 @@ export function EnrollmentManagement({
         {Boolean(priceInCents && priceInCents > 0) && (
           <form action={cancelPendingPaymentEnrollmentsAction}>
             <input name="rachaId" type="hidden" value={rachaId} />
-            <SubmitButton pendingLabel="Cancelando..." size="sm" variant="danger">
+            <SubmitButton
+              pendingLabel="Cancelando..."
+              size="sm"
+              variant="danger"
+            >
               Cancelar Inscrições Pendentes Pagamento.
             </SubmitButton>
           </form>
@@ -295,6 +301,11 @@ export function EnrollmentManagement({
                     <h3 className="text-lg font-bold text-slate-950">
                       {enrollment.participantName}
                     </h3>
+                    {enrollment.participantNickname ? (
+                      <Badge className="bg-slate-100 text-slate-700">
+                        @{enrollment.participantNickname}
+                      </Badge>
+                    ) : null}
                     {enrollment.isFemale && (
                       <Badge className="border border-pink-200 bg-pink-100 text-pink-700">
                         ♀ Mulher

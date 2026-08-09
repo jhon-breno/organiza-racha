@@ -54,6 +54,19 @@ function getWhatsappStatusMarker(
   return emoji;
 }
 
+function formatExportDisplayName(enrollment: AllAthleteEnrollment) {
+  const displayName = getDisplayName(
+    enrollment.participantName,
+    enrollment.participantNickname,
+  );
+
+  if (enrollment.participantPosition?.trim().toLowerCase() === "levantador") {
+    return `${displayName} (*L*)`;
+  }
+
+  return displayName;
+}
+
 function getStatusColor(
   status: string,
 ):
@@ -109,9 +122,10 @@ function generateWhatsappMessage(
     }
 
     const marker = getWhatsappStatusMarker(enrollment, priceInCents);
+    const displayName = formatExportDisplayName(enrollment);
     message += marker
-      ? `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${marker}\n`
-      : `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)}\n`;
+      ? `${index + 1} - ${displayName} ${marker}\n`
+      : `${index + 1} - ${displayName}\n`;
   }
 
   const goalkeeperSlots = Math.max(
@@ -131,9 +145,10 @@ function generateWhatsappMessage(
       }
 
       const marker = getWhatsappStatusMarker(enrollment, priceInCents);
+      const displayName = formatExportDisplayName(enrollment);
       message += marker
-        ? `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${marker}\n`
-        : `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)}\n`;
+        ? `${index + 1} - ${displayName} ${marker}\n`
+        : `${index + 1} - ${displayName}\n`;
     }
   }
 
@@ -143,9 +158,10 @@ function generateWhatsappMessage(
     for (let index = 0; index < waitlistEnrollments.length; index += 1) {
       const enrollment = waitlistEnrollments[index]!;
       const marker = getWhatsappStatusMarker(enrollment, priceInCents);
+      const displayName = formatExportDisplayName(enrollment);
       message += marker
-        ? `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${marker}\n`
-        : `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)}\n`;
+        ? `${index + 1} - ${displayName} ${marker}\n`
+        : `${index + 1} - ${displayName}\n`;
     }
   }
 

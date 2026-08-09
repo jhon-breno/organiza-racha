@@ -289,6 +289,7 @@ export default async function EditRachaPage({
                   paymentStatus: item.paymentStatus,
                 }))}
                 athleteLimit={racha.athleteLimit}
+                priceInCents={racha.priceInCents}
                 goalkeeperLimit={racha.goalkeeperLimit}
                 slug={racha.slug}
                 whatsappGroupUrl={racha.whatsappGroupUrl}
@@ -299,7 +300,16 @@ export default async function EditRachaPage({
 
         <EnrollmentManagement
           enrollments={racha.enrollments.map((enrollment) => ({
-            ...enrollment,
+            id: enrollment.id,
+            participantName: enrollment.participantName,
+            participantNickname: enrollment.user?.nickname ?? null,
+            participantPhone: enrollment.participantPhone,
+            participantPosition: enrollment.participantPosition,
+            participantLevel: enrollment.participantLevel,
+            isFemale: enrollment.isFemale,
+            status: enrollment.status,
+            paymentStatus: enrollment.paymentStatus,
+            createdAt: enrollment.createdAt,
             blockedForNextRacha: blockedUserIds.has(enrollment.userId),
           }))}
           modality={racha.modality}

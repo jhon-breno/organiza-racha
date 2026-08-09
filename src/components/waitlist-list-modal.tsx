@@ -52,9 +52,22 @@ function generateWhatsappMessage(
     return message;
   }
 
+  const formatExportDisplayName = (enrollment: WaitlistEnrollment) => {
+    const displayName = getDisplayName(
+      enrollment.participantName,
+      enrollment.participantNickname,
+    );
+
+    if (enrollment.participantPosition?.trim().toLowerCase() === "levantador") {
+      return `${displayName} (*L*)`;
+    }
+
+    return displayName;
+  };
+
   for (let index = 0; index < enrollments.length; index += 1) {
     const enrollment = enrollments[index]!;
-    message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} (${getEnrollmentStatusLabel(enrollment)})\n`;
+    message += `${index + 1} - ${formatExportDisplayName(enrollment)} (${getEnrollmentStatusLabel(enrollment)})\n`;
   }
 
   return message;

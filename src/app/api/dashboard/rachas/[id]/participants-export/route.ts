@@ -32,6 +32,17 @@ function getUnifiedEnrollmentStatus(enrollment: {
   return "Aguardando pagamento";
 }
 
+function formatExportParticipantName(input: {
+  participantName: string;
+  participantPosition?: string | null;
+}) {
+  if (input.participantPosition?.trim().toLowerCase() === "levantador") {
+    return `L ${input.participantName}`;
+  }
+
+  return input.participantName;
+}
+
 function getParticipantPixKey(notes?: string | null) {
   if (!notes) {
     return "Não informado";
@@ -104,7 +115,7 @@ export async function GET(
   }
 
   const rows = racha.enrollments.map((enrollment) => ({
-    name: enrollment.participantName,
+    name: formatExportParticipantName(enrollment),
     status: getUnifiedEnrollmentStatus(enrollment),
     phone: enrollment.participantPhone,
     pixKey: getParticipantPixKey(enrollment.notes),

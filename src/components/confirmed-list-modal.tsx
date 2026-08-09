@@ -46,6 +46,19 @@ function getUnifiedStatus(
   return participantStatusLabels[enrollment.status] ?? enrollment.status;
 }
 
+function formatExportDisplayName(enrollment: ExportableEnrollment) {
+  const displayName = getDisplayName(
+    enrollment.participantName,
+    enrollment.participantNickname,
+  );
+
+  if (enrollment.participantPosition?.trim().toLowerCase() === "levantador") {
+    return `${displayName} (*L*)`;
+  }
+
+  return displayName;
+}
+
 function generateWhatsappMessage(
   rachaTitle: string,
   eventDate: Date,
@@ -66,7 +79,7 @@ function generateWhatsappMessage(
   for (let i = 0; i < athleteLimit; i++) {
     if (i < lineEnrollments.length) {
       const status = getUnifiedStatus(lineEnrollments[i]!, priceInCents);
-      message += `${i + 1} - ${getDisplayName(lineEnrollments[i]!.participantName, lineEnrollments[i]!.participantNickname)} (${status})\n`;
+      message += `${i + 1} - ${formatExportDisplayName(lineEnrollments[i]!)} (${status})\n`;
     } else {
       message += `${i + 1} - \n`;
     }
@@ -82,7 +95,7 @@ function generateWhatsappMessage(
 
     for (let i = 0; i < goalkeeperSlots; i++) {
       if (i < goalkeeperEnrollments.length) {
-        message += `${i + 1} - ${getDisplayName(goalkeeperEnrollments[i]!.participantName, goalkeeperEnrollments[i]!.participantNickname)}\n`;
+        message += `${i + 1} - ${formatExportDisplayName(goalkeeperEnrollments[i]!)}\n`;
       } else {
         message += `${i + 1} - \n`;
       }

@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Search, UserPlus, UserX, X } from "lucide-react";
-import { addOrganizerEnrollmentAction, searchUsersByPhoneAction } from "@/actions";
+import {
+  addOrganizerEnrollmentAction,
+  searchUsersByPhoneAction,
+} from "@/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,6 +31,7 @@ type AddAthleteModalProps = {
 type SearchedUser = {
   id: string;
   name: string;
+  nickname: string;
   phone: string;
 };
 
@@ -173,14 +177,15 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                       Adicionar Atleta
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Busque o participante pelo telefone ou nome para incluir no racha.
+                      Busque o participante por telefone, nome ou apelido para
+                      incluir no racha.
                     </p>
                   </div>
 
                   {/* Search Input */}
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-slate-800">
-                      Telefone ou Nome do Atleta
+                      Telefone, Nome ou Apelido do Atleta
                     </label>
                     <div className="relative">
                       <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -191,7 +196,7 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                           setSearchQuery(e.target.value);
                           if (selectedUser) setSelectedUser(null);
                         }}
-                        placeholder="Digite o telefone ou nome..."
+                        placeholder="Digite o telefone, nome ou apelido..."
                         value={searchQuery}
                       />
                     </div>
@@ -209,6 +214,11 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                             <p className="font-bold text-slate-900">
                               {selectedUser.name}
                             </p>
+                            {selectedUser.nickname ? (
+                              <p className="text-xs text-slate-500">
+                                Apelido: {selectedUser.nickname}
+                              </p>
+                            ) : null}
                             <p className="text-xs text-slate-600">
                               {formatPhone(selectedUser.phone)}
                             </p>
@@ -257,6 +267,11 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                                   <p className="text-sm font-semibold text-slate-900">
                                     {user.name}
                                   </p>
+                                  {user.nickname ? (
+                                    <p className="text-xs text-slate-500">
+                                      Apelido: {user.nickname}
+                                    </p>
+                                  ) : null}
                                   <p className="text-xs text-slate-500">
                                     {formatPhone(user.phone)}
                                   </p>
@@ -285,7 +300,8 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                                 Nenhum atleta encontrado
                               </p>
                               <p className="text-xs text-slate-500 mt-0.5">
-                                Não encontramos nenhum usuário com esse telefone/nome.
+                                Não encontramos nenhum usuário com esse
+                                telefone, nome ou apelido.
                               </p>
                             </div>
                             <Button
@@ -322,7 +338,10 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
 
                       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
                         Posição
-                        <Select defaultValue="Versátil" name="participantPosition">
+                        <Select
+                          defaultValue="Versátil"
+                          name="participantPosition"
+                        >
                           {availablePositions.map((position) => (
                             <option key={position} value={position}>
                               {position}
@@ -387,7 +406,8 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
                       Criar Novo Usuário
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      O usuário será cadastrado no sistema e adicionado a este racha automaticamente.
+                      O usuário será cadastrado no sistema e adicionado a este
+                      racha automaticamente.
                     </p>
                   </div>
 
@@ -444,7 +464,10 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
 
                     <label className="block space-y-1.5 text-sm font-medium text-slate-700">
                       Posição
-                      <Select defaultValue="Versátil" name="participantPosition">
+                      <Select
+                        defaultValue="Versátil"
+                        name="participantPosition"
+                      >
                         {availablePositions.map((position) => (
                           <option key={position} value={position}>
                             {position}
