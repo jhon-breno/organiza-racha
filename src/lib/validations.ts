@@ -192,26 +192,25 @@ export const rachaFormSchema = z
     }
   });
 
-export const enrollmentSchema = z
-  .object({
-    rachaId: z.string().min(1),
-    slug: z.string().min(1),
-    participantName: z.string().min(2, "Informe seu nome."),
-    participantPhone: z.string().min(8, "Informe um telefone válido."),
-    participantPosition: z.string().min(2, "Informe sua posição."),
-    participantLevel: z.enum(participantLevelValues),
-    isFemale: z.coerce.boolean().optional(),
-    notes: z
-      .string()
-      .max(280, "Observações com no máximo 280 caracteres.")
-      .optional()
-      .or(z.literal("")),
-    acceptedRules: z.coerce
-      .boolean()
-      .refine((value) => value, "Você deve aceitar as regras."),
-    paymentCommitment: z.coerce.boolean().default(false),
-    accessKey: z.string().optional().or(z.literal("")),
-  });
+export const enrollmentSchema = z.object({
+  rachaId: z.string().min(1),
+  slug: z.string().min(1),
+  participantName: z.string().min(2, "Informe seu nome."),
+  participantPhone: z.string().min(8, "Informe um telefone válido."),
+  participantPosition: z.string().min(2, "Informe sua posição."),
+  participantLevel: z.enum(participantLevelValues),
+  isFemale: z.coerce.boolean().optional(),
+  notes: z
+    .string()
+    .max(280, "Observações com no máximo 280 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  acceptedRules: z.coerce
+    .boolean()
+    .refine((value) => value, "Você deve aceitar as regras."),
+  paymentCommitment: z.coerce.boolean().default(false),
+  accessKey: z.string().optional().or(z.literal("")),
+});
 
 export const organizerEnrollmentSchema = z.object({
   rachaId: z.string().min(1, "Racha inválido."),
@@ -429,6 +428,25 @@ export const resetPasswordSchema = z
     }
   });
 
+export const adminSetUserPasswordSchema = z
+  .object({
+    userId: z.string().trim().min(1, "Usuário inválido."),
+    password: z
+      .string()
+      .min(6, "A senha deve ter pelo menos 6 caracteres.")
+      .max(72, "A senha deve ter no máximo 72 caracteres."),
+    confirmPassword: z.string().min(1, "Confirme a senha."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "As senhas não conferem.",
+      });
+    }
+  });
+
 export const recoverIdentifierSchema = z.object({
   name: z.string().trim().min(2, "Informe seu nome."),
   knownIdentifier: z.string().trim().min(3, "Informe e-mail ou telefone."),
@@ -450,9 +468,12 @@ export const organizerDataSettingsSchema = z.object({
 export const addOrganizerUserSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome completo."),
   nickname: z.string().trim().optional().or(z.literal("")),
-  phone: z.string().trim().refine((val) => val.replace(/\D/g, "").length >= 10, {
-    message: "Informe o telefone com DDD e o 9 (ex: 85999469423).",
-  }),
+  phone: z
+    .string()
+    .trim()
+    .refine((val) => val.replace(/\D/g, "").length >= 10, {
+      message: "Informe o telefone com DDD e o 9 (ex: 85999469423).",
+    }),
   email: z.string().trim().optional().or(z.literal("")),
   password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
 });

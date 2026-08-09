@@ -28,6 +28,16 @@ function getExportTypeLabel(type: string) {
   return "Todos os atletas";
 }
 
+function getExportStatusMarker(enrollment: Enrollment, priceInCents: number) {
+  const emoji = getEnrollmentStatusEmoji(enrollment);
+
+  if (priceInCents === 0 && emoji === "✅") {
+    return "";
+  }
+
+  return emoji;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -151,9 +161,8 @@ function generateExcel(
         enrollment.participantName,
         enrollment.participantPhone,
         enrollment.participantPosition,
-        levelLabels[
-          enrollment.participantLevel as keyof typeof levelLabels
-        ] || enrollment.participantLevel,
+        levelLabels[enrollment.participantLevel as keyof typeof levelLabels] ||
+          enrollment.participantLevel,
         getEnrollmentStatusLabel(enrollment),
       ])
     : [
@@ -277,6 +286,14 @@ async function generatePDF(
     y -= lineHeight;
   };
 
+  const buildLineWithStatusMarker = (index: number, enrollment: Enrollment) => {
+    const marker = getExportStatusMarker(enrollment, racha.priceInCents);
+
+    return marker
+      ? `${index + 1} - ${enrollment.participantName} ${marker}`
+      : `${index + 1} - ${enrollment.participantName}`;
+  };
+
   const ensureSpace = (needed = 56) => {
     if (y - needed < margin) {
       page = pdfDoc.addPage([pageWidth, pageHeight]);
@@ -292,12 +309,9 @@ async function generatePDF(
     size: 10,
   });
   y -= 14;
-  drawText(
-    `Tipo de lista: ${getExportTypeLabel(type)}`,
-    margin,
-    y,
-    { size: 10 },
-  );
+  drawText(`Tipo de lista: ${getExportTypeLabel(type)}`, margin, y, {
+    size: 10,
+  });
   y -= 24;
 
   if (isWaitlistOnly) {
@@ -309,9 +323,7 @@ async function generatePDF(
       for (let index = 0; index < waitlistEnrollments.length; index += 1) {
         ensureSpace();
         const enrollment = waitlistEnrollments[index]!;
-        drawLine(
-          `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`,
-        );
+        drawLine(buildLineWithStatusMarker(index, enrollment));
       }
     }
 
@@ -337,9 +349,7 @@ async function generatePDF(
       continue;
     }
 
-    drawLine(
-      `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`,
-    );
+    drawLine(buildLineWithStatusMarker(index, enrollment));
   }
 
   if (goalkeeperSlots > 0) {
@@ -351,7 +361,7 @@ async function generatePDF(
       const enrollment = goalkeeperEnrollments[index];
       drawLine(
         enrollment
-          ? `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`
+          ? buildLineWithStatusMarker(index, enrollment)
           : `${index + 1} - `,
       );
     }
@@ -365,9 +375,7 @@ async function generatePDF(
     for (let index = 0; index < waitlistEnrollments.length; index += 1) {
       ensureSpace();
       const enrollment = waitlistEnrollments[index]!;
-      drawLine(
-        `${index + 1} - ${enrollment.participantName} ${getEnrollmentStatusEmoji(enrollment)}`,
-      );
+      drawLine(buildLineWithStatusMarker(index, enrollment));
     }
   }
 

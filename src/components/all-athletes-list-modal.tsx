@@ -35,10 +35,24 @@ type AllAthletesListModalProps = {
   locationName: string;
   enrollments: AllAthleteEnrollment[];
   athleteLimit: number;
+  priceInCents?: number;
   goalkeeperLimit?: number | null;
   slug: string;
   whatsappGroupUrl?: string | null;
 };
+
+function getWhatsappStatusMarker(
+  enrollment: AllAthleteEnrollment,
+  priceInCents?: number,
+) {
+  const emoji = getEnrollmentStatusEmoji(enrollment);
+
+  if (priceInCents === 0 && emoji === "✅") {
+    return "";
+  }
+
+  return emoji;
+}
 
 function getStatusColor(
   status: string,
@@ -69,6 +83,7 @@ function generateWhatsappMessage(
   goalkeeperEnrollments: AllAthleteEnrollment[],
   waitlistEnrollments: AllAthleteEnrollment[],
   athleteLimit: number,
+  priceInCents: number | undefined,
   goalkeeperLimit: number | null | undefined,
   slug: string,
 ): string {
@@ -93,7 +108,10 @@ function generateWhatsappMessage(
       continue;
     }
 
-    message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+    const marker = getWhatsappStatusMarker(enrollment, priceInCents);
+    message += marker
+      ? `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${marker}\n`
+      : `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)}\n`;
   }
 
   const goalkeeperSlots = Math.max(
@@ -112,7 +130,10 @@ function generateWhatsappMessage(
         continue;
       }
 
-      message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+      const marker = getWhatsappStatusMarker(enrollment, priceInCents);
+      message += marker
+        ? `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${marker}\n`
+        : `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)}\n`;
     }
   }
 
@@ -121,7 +142,10 @@ function generateWhatsappMessage(
 
     for (let index = 0; index < waitlistEnrollments.length; index += 1) {
       const enrollment = waitlistEnrollments[index]!;
-      message += `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${getEnrollmentStatusEmoji(enrollment)}\n`;
+      const marker = getWhatsappStatusMarker(enrollment, priceInCents);
+      message += marker
+        ? `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)} ${marker}\n`
+        : `${index + 1} - ${getDisplayName(enrollment.participantName, enrollment.participantNickname)}\n`;
     }
   }
 
@@ -135,6 +159,7 @@ export function AllAthletesListModal({
   locationName,
   enrollments,
   athleteLimit,
+  priceInCents,
   goalkeeperLimit,
   slug,
   whatsappGroupUrl,
@@ -216,6 +241,7 @@ export function AllAthletesListModal({
         goalkeeperEnrollments,
         waitlistEnrollments,
         athleteLimit,
+        priceInCents,
         goalkeeperLimit,
         slug,
       ),
@@ -226,6 +252,7 @@ export function AllAthletesListModal({
       goalkeeperLimit,
       lineEnrollments,
       locationName,
+      priceInCents,
       rachaTitle,
       slug,
       waitlistEnrollments,

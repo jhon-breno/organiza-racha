@@ -87,6 +87,7 @@ export const recurrenceFrequencyOptions = [
 ] as const;
 
 export const ORGANIZER_DEFAULT_PHONE = "99999999999";
+export const SUPER_ADMIN_EMAIL = "jhonbreno@gmail.com";
 
 export const levelOptions = participantLevelOptions;
 

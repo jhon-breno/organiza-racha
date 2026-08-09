@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, isGoogleConfigured, signIn, signOut } from "@/auth";
-import { ORGANIZER_DEFAULT_PHONE } from "@/lib/constants";
+import { ORGANIZER_DEFAULT_PHONE, SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
 import { detectIsFemaleByName } from "@/lib/gender";
 import { participantLevelValues } from "@/lib/participant-level";
@@ -26,6 +26,7 @@ import {
   credentialsSignInSchema,
   enrollmentSchema,
   addOrganizerUserSchema,
+  adminSetUserPasswordSchema,
   forgotPasswordSchema,
   organizerDataSettingsSchema,
   organizerAddRachaAdminSchema,
@@ -533,6 +534,30 @@ async function requireUser(callbackUrl?: string) {
   }
 
   return session.user;
+}
+
+function isSuperAdminEmail(email?: string | null) {
+  if (!email) {
+    return false;
+  }
+
+  return normalizeEmailValue(email) === SUPER_ADMIN_EMAIL;
+}
+
+async function requireSuperAdminUser(callbackUrl?: string) {
+  const user = await requireUser(callbackUrl);
+
+  if (!isSuperAdminEmail(user.email)) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard",
+        "error",
+        "Acesso restrito ao administrador principal.",
+      ),
+    );
+  }
+
+  return user;
 }
 
 async function isUserRachaAdmin(userId: string, rachaId: string) {
@@ -1075,14 +1100,17 @@ export async function createOrganizerUserAction(formData: FormData) {
       buildMessageUrl(
         "/dashboard",
         "error",
-        parsed.error.issues[0]?.message ?? "Preencha os dados do usuário corretamente.",
+        parsed.error.issues[0]?.message ??
+          "Preencha os dados do usuário corretamente.",
         { field },
       ),
     );
   }
 
   const phone = normalizePhoneValue(parsed.data.phone);
-  const email = parsed.data.email ? normalizeEmailValue(parsed.data.email) : null;
+  const email = parsed.data.email
+    ? normalizeEmailValue(parsed.data.email)
+    : null;
   const canUseNickname = supportsUserField("nickname");
 
   if (email) {
@@ -1118,10 +1146,8 @@ export async function createOrganizerUserAction(formData: FormData) {
   const passwordHash = await hash(parsed.data.password, 10);
 
   const isFemaleInput =
-    formData.get("isFemale") === "true" ||
-    formData.get("isFemale") === "on";
-  const isFemaleValue =
-    isFemaleInput || detectIsFemaleByName(parsed.data.name);
+    formData.get("isFemale") === "true" || formData.get("isFemale") === "on";
+  const isFemaleValue = isFemaleInput || detectIsFemaleByName(parsed.data.name);
 
   const createData: Record<string, unknown> = {
     name: parsed.data.name,
@@ -1147,6 +1173,66 @@ export async function createOrganizerUserAction(formData: FormData) {
       "/dashboard",
       "success",
       `Usuário ${parsed.data.name} adicionado ao banco com sucesso!`,
+    ),
+  );
+}
+
+export async function adminSetUserPasswordAction(formData: FormData) {
+  await requireSuperAdminUser("/dashboard/usuarios");
+
+  const parsed = adminSetUserPasswordSchema.safeParse({
+    userId: getStringValue(formData, "userId"),
+    password: getStringValue(formData, "password"),
+    confirmPassword: getStringValue(formData, "confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível redefinir a senha do usuário.",
+        { field },
+      ),
+    );
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: parsed.data.userId },
+    select: { id: true, name: true },
+  });
+
+  if (!targetUser) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        "Usuário não encontrado.",
+      ),
+    );
+  }
+
+  const nextPasswordHash = await hash(parsed.data.password, 10);
+
+  await prisma.user.update({
+    where: { id: targetUser.id },
+    data: {
+      passwordHash: nextPasswordHash,
+      mustChangePassword: true,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    },
+  });
+
+  revalidatePath("/dashboard/usuarios");
+
+  redirect(
+    buildMessageUrl(
+      "/dashboard/usuarios",
+      "success",
+      `Senha de ${targetUser.name ?? "usuário"} redefinida. No próximo login ele deverá criar uma nova senha.`,
     ),
   );
 }
@@ -1273,7 +1359,9 @@ export async function createRachaAction(formData: FormData) {
   }
   const isFree = parsed.data.price === 0;
   const paymentDeadline =
-    !isFree && parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
+    !isFree &&
+    parsed.data.paymentDeadlineDate &&
+    parsed.data.paymentDeadlineTime
       ? combineDateAndTime(
           parsed.data.paymentDeadlineDate,
           parsed.data.paymentDeadlineTime,
@@ -1429,7 +1517,9 @@ export async function updateRachaAction(formData: FormData) {
   }
   const isFree = parsed.data.price === 0;
   const paymentDeadline =
-    !isFree && parsed.data.paymentDeadlineDate && parsed.data.paymentDeadlineTime
+    !isFree &&
+    parsed.data.paymentDeadlineDate &&
+    parsed.data.paymentDeadlineTime
       ? combineDateAndTime(
           parsed.data.paymentDeadlineDate,
           parsed.data.paymentDeadlineTime,
@@ -1725,8 +1815,7 @@ export async function joinRachaAction(formData: FormData) {
   }
 
   const isFemaleValue =
-    parsed.data.isFemale ??
-    detectIsFemaleByName(parsed.data.participantName);
+    parsed.data.isFemale ?? detectIsFemaleByName(parsed.data.participantName);
 
   const participantUser = session?.user?.id
     ? { id: session.user.id }
@@ -3265,9 +3354,7 @@ export async function updateProfileAction(formData: FormData) {
   }
 
   if (!email || !email.includes("@")) {
-    redirect(
-      buildMessageUrl("/perfil", "error", "Informe um e-mail válido."),
-    );
+    redirect(buildMessageUrl("/perfil", "error", "Informe um e-mail válido."));
   }
 
   const emailInUse = await prisma.user.findFirst({
@@ -3446,4 +3533,3 @@ export async function toggleOrganizerEnrollmentFemaleAction(
     ),
   );
 }
-

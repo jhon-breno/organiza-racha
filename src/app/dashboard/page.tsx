@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ParticipantStatus, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
@@ -22,7 +23,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SubmitButton } from "@/components/submit-button";
-import { modalityLabels } from "@/lib/constants";
+import { modalityLabels, SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import {
   isAwaitingPaymentEnrollment,
   isConfirmedEnrollment,
@@ -121,6 +122,7 @@ export default async function DashboardPage({
       : "";
   const organizerEmail =
     typeof organizerProfile.email === "string" ? organizerProfile.email : "";
+  const isSuperAdmin = organizerEmail.toLowerCase() === SUPER_ADMIN_EMAIL;
 
   const adminRachaLinks = supportsRachaAdminModel
     ? await prisma.rachaAdmin.findMany({
@@ -200,6 +202,11 @@ export default async function DashboardPage({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {isSuperAdmin ? (
+            <Button asChild variant="secondary">
+              <Link href="/dashboard/usuarios">Gerenciar usuários</Link>
+            </Button>
+          ) : null}
           <AddUserDialog />
           <NewRachaTypeDialog />
         </div>

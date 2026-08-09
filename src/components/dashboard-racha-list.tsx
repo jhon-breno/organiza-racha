@@ -282,6 +282,7 @@ export function DashboardRachaList({
                         eventDate={racha.eventDate}
                         goalkeeperLimit={racha.goalkeeperLimit}
                         locationName={racha.locationName}
+                        priceInCents={racha.priceInCents}
                         rachaId={racha.id}
                         rachaTitle={racha.title}
                         slug={racha.slug}
