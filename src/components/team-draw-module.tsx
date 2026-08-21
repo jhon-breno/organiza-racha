@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
+  Maximize2,
   MessageCircle,
   Minus,
+  Minimize2,
   Plus,
   RotateCcw,
   Shuffle,
@@ -28,6 +30,7 @@ import {
 import { detectIsFemaleByName } from "@/lib/gender";
 import {
   getParticipantLevelLabel,
+  getParticipantLevelScore,
   getParticipantLevelVisual,
 } from "@/lib/participant-level";
 import { formatDateTimeShort, getDisplayName } from "@/lib/utils";
@@ -70,11 +73,6 @@ type MatchHistoryItem = {
   createdAt: Date;
 };
 
-type WinnerPromptState = {
-  winnerSlot: "home" | "away";
-  winnerTeamName: string;
-};
-
 type PersistedTeamDrawState = {
   seed: number;
   teamCount: number;
@@ -90,7 +88,17 @@ type PersistedMatchFlowEnvelope = {
   version: 1;
   flow: MatchFlowState | null;
   drawnTeams: DrawTeam[];
+  currentScores?: MatchScores;
 };
+
+type TeamDrawApiState =
+  | (Omit<PersistedTeamDrawState, "seed"> & {
+      seed: string | number;
+      updatedAt?: string;
+    })
+  | null;
+
+type TeamSlot = "players" | "setters" | "goalkeepers";
 
 type TeamRankingItem = {
   teamId: string;
@@ -101,6 +109,11 @@ type TeamRankingItem = {
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
+};
+
+type WinnerPromptState = {
+  winnerSlot: "home" | "away";
+  winnerTeamName: string;
 };
 
 function createInitialMatchFlow(teams: DrawTeam[]): MatchFlowState | null {
@@ -272,6 +285,8 @@ export function TeamDrawModule({
   enrollments,
 }: TeamDrawModuleProps) {
   const teamCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const skipNextPersistFromRemoteRef = useRef(false);
+  const matchCardRef = useRef<HTMLDivElement | null>(null);
   const isHydratingStateRef = useRef(true);
   const persistenceDebounceRef = useRef<number | null>(null);
   const [seed, setSeed] = useState(() => Date.now());
@@ -291,6 +306,8 @@ export function TeamDrawModule({
   const [winnerPrompt, setWinnerPrompt] = useState<WinnerPromptState | null>(
     null,
   );
+  const [isMatchFullscreen, setIsMatchFullscreen] = useState(false);
+  const [selectedSwapAthleteKey, setSelectedSwapAthleteKey] = useState("");
   const [dismissedWinnerKey, setDismissedWinnerKey] = useState<string | null>(
     null,
   );
@@ -313,6 +330,13 @@ export function TeamDrawModule({
       body: JSON.stringify(payload),
       keepalive: options?.keepalive,
     });
+  };
+
+  const clearScheduledPersistence = () => {
+    if (persistenceDebounceRef.current) {
+      window.clearTimeout(persistenceDebounceRef.current);
+      persistenceDebounceRef.current = null;
+    }
   };
   const linePlayers = useMemo(
     () =>
@@ -541,6 +565,66 @@ export function TeamDrawModule({
   useEffect(() => {
     let isMounted = true;
 
+    const applyRemoteState = (state: TeamDrawApiState) => {
+      if (!state) {
+        return;
+      }
+
+      skipNextPersistFromRemoteRef.current = true;
+
+      const restoredSeed = Number(state.seed);
+
+      if (Number.isFinite(restoredSeed)) {
+        setSeed(restoredSeed);
+      }
+
+      if (typeof state.teamCount === "number") {
+        setTeamCount(Math.max(2, Math.min(maxTeamCount, state.teamCount)));
+      }
+
+      if (state.drawnAt) {
+        setDrawnAt(new Date(state.drawnAt));
+        setIsDrawing(false);
+        setRevealedTeamCount(999);
+      }
+
+      if (typeof state.scoreToWin === "number") {
+        setScoreToWin(Math.max(5, Math.min(50, state.scoreToWin)));
+      }
+
+      if (state.matchFlow === null) {
+        setMatchFlow(null);
+        setMatchScores({ home: 0, away: 0 });
+      } else if (isMatchFlowState(state.matchFlow)) {
+        setMatchFlow(state.matchFlow);
+        setMatchScores({ home: 0, away: 0 });
+      } else if (state.matchFlow && typeof state.matchFlow === "object") {
+        const envelope = state.matchFlow as Partial<PersistedMatchFlowEnvelope>;
+
+        if (envelope.flow === null || isMatchFlowState(envelope.flow)) {
+          setMatchFlow(envelope.flow ?? null);
+        }
+
+        if (isDrawTeamArray(envelope.drawnTeams)) {
+          setPersistedDrawTeams(envelope.drawnTeams);
+        }
+
+        // Placar em andamento permanece local por operador para evitar jitter.
+        setMatchScores({ home: 0, away: 0 });
+      }
+
+      if (Array.isArray(state.matchHistory)) {
+        setMatchHistory(
+          state.matchHistory
+            .map((item) => ({
+              ...item,
+              createdAt: new Date(item.createdAt),
+            }))
+            .filter((item) => !Number.isNaN(item.createdAt.getTime())),
+        );
+      }
+    };
+
     const loadPersistedState = async () => {
       try {
         const response = await fetch(
@@ -555,70 +639,13 @@ export function TeamDrawModule({
           return;
         }
 
-        const data = (await response.json()) as {
-          state:
-            | (Omit<PersistedTeamDrawState, "seed"> & {
-                seed: string | number;
-              })
-            | null;
-        };
+        const data = (await response.json()) as { state: TeamDrawApiState };
 
-        if (!isMounted || !data.state) {
+        if (!isMounted) {
           return;
         }
 
-        const restoredSeed = Number(data.state.seed);
-
-        if (Number.isFinite(restoredSeed)) {
-          setSeed(restoredSeed);
-        }
-
-        if (typeof data.state.teamCount === "number") {
-          setTeamCount(
-            Math.max(2, Math.min(maxTeamCount, data.state.teamCount)),
-          );
-        }
-
-        if (data.state.drawnAt) {
-          setDrawnAt(new Date(data.state.drawnAt));
-          setIsDrawing(false);
-          setRevealedTeamCount(999);
-        }
-
-        if (typeof data.state.scoreToWin === "number") {
-          setScoreToWin(Math.max(5, Math.min(50, data.state.scoreToWin)));
-        }
-
-        if (data.state.matchFlow === null) {
-          setMatchFlow(null);
-        } else if (isMatchFlowState(data.state.matchFlow)) {
-          setMatchFlow(data.state.matchFlow);
-        } else if (
-          data.state.matchFlow &&
-          typeof data.state.matchFlow === "object"
-        ) {
-          const envelope = data.state
-            .matchFlow as Partial<PersistedMatchFlowEnvelope>;
-
-          if (envelope.flow === null || isMatchFlowState(envelope.flow)) {
-            setMatchFlow(envelope.flow ?? null);
-          }
-
-          if (isDrawTeamArray(envelope.drawnTeams)) {
-            setPersistedDrawTeams(envelope.drawnTeams);
-          }
-        }
-
-        if (Array.isArray(data.state.matchHistory)) {
-          setMatchHistory(
-            data.state.matchHistory
-              .map((item) => ({
-                ...item,
-                createdAt: new Date(item.createdAt),
-              }))
-              .filter((item) => !Number.isNaN(item.createdAt.getTime())),
-          );
-        }
+        applyRemoteState(data.state);
       } catch {
         // If persisted state fails to load, the user can keep using local in-memory flow.
       } finally {
@@ -641,9 +668,12 @@ export function TeamDrawModule({
       return;
     }
 
-    if (persistenceDebounceRef.current) {
-      window.clearTimeout(persistenceDebounceRef.current);
+    if (skipNextPersistFromRemoteRef.current) {
+      skipNextPersistFromRemoteRef.current = false;
+      return;
     }
+
+    clearScheduledPersistence();
 
     persistenceDebounceRef.current = window.setTimeout(() => {
       const payload: PersistedTeamDrawState = {
@@ -666,9 +696,7 @@ export function TeamDrawModule({
     }, 350);
 
     return () => {
-      if (persistenceDebounceRef.current) {
-        window.clearTimeout(persistenceDebounceRef.current);
-      }
+      clearScheduledPersistence();
     };
   }, [
     drawnAt,
@@ -684,6 +712,8 @@ export function TeamDrawModule({
   ]);
 
   const startNewDraw = () => {
+    clearScheduledPersistence();
+
     const nextSeed = Date.now();
     const drawnAtNow = new Date();
     const nextTeams = drawBalancedTeams({
@@ -719,6 +749,127 @@ export function TeamDrawModule({
     setMatchScores({ home: 0, away: 0 });
     setMatchHistory([]);
     setShowNewDrawModal(false);
+    setSelectedSwapAthleteKey("");
+  };
+
+  const swapAthletesByKey = (fromKey: string, toKey: string) => {
+    clearScheduledPersistence();
+
+    if (!fromKey || !toKey || fromKey === toKey) {
+      return;
+    }
+
+    const [fromTeamId, fromSlot, fromPlayerId] = fromKey.split("|");
+    const [toTeamId, toSlot, toPlayerId] = toKey.split("|");
+
+    if (
+      !fromTeamId ||
+      !fromSlot ||
+      !fromPlayerId ||
+      !toTeamId ||
+      !toSlot ||
+      !toPlayerId
+    ) {
+      addToast("Dados da troca invalidos.", "error");
+      return;
+    }
+
+    if (fromTeamId === toTeamId) {
+      addToast("A troca precisa ser entre times diferentes.", "error");
+      return;
+    }
+
+    const nextTeams = teams.map((team) => ({
+      ...team,
+      players: [...team.players],
+      setters: [...team.setters],
+      goalkeepers: [...team.goalkeepers],
+    }));
+
+    const fromTeam = nextTeams.find((team) => team.id === fromTeamId);
+    const toTeam = nextTeams.find((team) => team.id === toTeamId);
+
+    if (!fromTeam || !toTeam) {
+      addToast("Nao foi possivel localizar os times da troca.", "error");
+      return;
+    }
+
+    const fromCollection = fromTeam[
+      fromSlot as TeamSlot
+    ] as TeamDrawParticipant[];
+    const toCollection = toTeam[toSlot as TeamSlot] as TeamDrawParticipant[];
+    const fromIndex = fromCollection.findIndex(
+      (item) => item.id === fromPlayerId,
+    );
+    const toIndex = toCollection.findIndex((item) => item.id === toPlayerId);
+
+    if (fromIndex < 0 || toIndex < 0) {
+      addToast("Nao foi possivel localizar os atletas da troca.", "error");
+      return;
+    }
+
+    const fromAthlete = fromCollection[fromIndex];
+    const toAthlete = toCollection[toIndex];
+
+    fromCollection[fromIndex] = toAthlete;
+    toCollection[toIndex] = fromAthlete;
+
+    nextTeams.forEach((team) => {
+      team.totalScore = [
+        ...team.players,
+        ...team.setters,
+        ...team.goalkeepers,
+      ].reduce(
+        (total, player) =>
+          total + getParticipantLevelScore(player.participantLevel),
+        0,
+      );
+    });
+
+    if (!drawnAt) {
+      addToast("Nao foi possivel salvar a troca sem sorteio ativo.", "error");
+      return;
+    }
+
+    persistTeamDrawState({
+      seed,
+      teamCount,
+      drawnAt: drawnAt.toISOString(),
+      scoreToWin,
+      matchFlow: {
+        version: 1,
+        flow: matchFlow,
+        drawnTeams: nextTeams,
+      },
+      matchHistory: matchHistory.map((item) => ({
+        ...item,
+        createdAt: item.createdAt.toISOString(),
+      })),
+    });
+
+    setPersistedDrawTeams(nextTeams);
+    setSelectedSwapAthleteKey("");
+    addToast("Atletas trocados com sucesso.", "success");
+  };
+
+  const handleAthleteSelection = (
+    teamId: string,
+    slot: TeamSlot,
+    participantId: string,
+  ) => {
+    const nextKey = `${teamId}|${slot}|${participantId}`;
+
+    if (!selectedSwapAthleteKey) {
+      setSelectedSwapAthleteKey(nextKey);
+      return;
+    }
+
+    if (selectedSwapAthleteKey === nextKey) {
+      setSelectedSwapAthleteKey("");
+      return;
+    }
+
+    swapAthletesByKey(selectedSwapAthleteKey, nextKey);
   };
 
   const handleDraw = () => {
@@ -926,6 +1077,36 @@ export function TeamDrawModule({
     dismissedWinnerKey,
   ]);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenElement = document.fullscreenElement;
+      setIsMatchFullscreen(fullscreenElement === matchCardRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleMatchFullscreen = async () => {
+    if (!matchCardRef.current) {
+      return;
+    }
+
+    try {
+      if (document.fullscreenElement === matchCardRef.current) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await matchCardRef.current.requestFullscreen();
+    } catch {
+      addToast("Nao foi possivel alternar tela cheia.", "error");
+    }
+  };
+
   const hasPersistedOrDrawnTeams = drawnAt && teams.length >= 2;
 
   if (
@@ -1057,7 +1238,7 @@ export function TeamDrawModule({
         </div>
 
         {showNewDrawModal ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
             <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">
                 Confirmar novo sorteio
@@ -1087,7 +1268,7 @@ export function TeamDrawModule({
         ) : null}
 
         {winnerPrompt ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
             <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                 Partida encerrada
@@ -1254,10 +1435,25 @@ export function TeamDrawModule({
                               const isFemale =
                                 setter.isFemale ??
                                 detectIsFemaleByName(setter.participantName);
+                              const athleteKey = `${team.id}|setters|${setter.id}`;
+                              const isSelected =
+                                selectedSwapAthleteKey === athleteKey;
                               return (
-                                <div
+                                <button
                                   key={setter.id}
-                                  className="flex items-center justify-between gap-3 text-sm text-slate-800"
+                                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-slate-800 transition ${
+                                    isSelected
+                                      ? "bg-teal-100 ring-2 ring-teal-400"
+                                      : "hover:bg-sky-100/60"
+                                  }`}
+                                  onClick={() =>
+                                    handleAthleteSelection(
+                                      team.id,
+                                      "setters",
+                                      setter.id,
+                                    )
+                                  }
+                                  type="button"
                                 >
                                   <span className="flex items-center gap-1.5 font-medium">
                                     {setter.participantName}
@@ -1272,7 +1468,7 @@ export function TeamDrawModule({
                                       setter.participantLevel,
                                     )}
                                   </span>
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
@@ -1284,11 +1480,26 @@ export function TeamDrawModule({
                           const isFemale =
                             participant.isFemale ??
                             detectIsFemaleByName(participant.participantName);
+                          const athleteKey = `${team.id}|players|${participant.id}`;
+                          const isSelected =
+                            selectedSwapAthleteKey === athleteKey;
 
                           return (
-                            <div
+                            <button
                               key={participant.id}
-                              className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                              className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                                isSelected
+                                  ? "border-teal-400 bg-teal-50 ring-2 ring-teal-300"
+                                  : "border-slate-100 bg-slate-50 hover:bg-slate-100"
+                              }`}
+                              onClick={() =>
+                                handleAthleteSelection(
+                                  team.id,
+                                  "players",
+                                  participant.id,
+                                )
+                              }
+                              type="button"
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -1320,7 +1531,7 @@ export function TeamDrawModule({
                                   </p>
                                 </div>
                               </div>
-                            </div>
+                            </button>
                           );
                         })}
                       </div>
@@ -1331,19 +1542,37 @@ export function TeamDrawModule({
                             Goleiros
                           </p>
                           <div className="mt-2 space-y-2">
-                            {team.goalkeepers.map((goalkeeper) => (
-                              <div
-                                key={goalkeeper.id}
-                                className="flex items-center justify-between gap-3 text-sm text-slate-800"
-                              >
-                                <span>{goalkeeper.participantName}</span>
-                                <span className="text-xs text-amber-700">
-                                  {getParticipantLevelVisual(
-                                    goalkeeper.participantLevel,
-                                  )}
-                                </span>
-                              </div>
-                            ))}
+                            {team.goalkeepers.map((goalkeeper) => {
+                              const athleteKey = `${team.id}|goalkeepers|${goalkeeper.id}`;
+                              const isSelected =
+                                selectedSwapAthleteKey === athleteKey;
+
+                              return (
+                                <button
+                                  key={goalkeeper.id}
+                                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-slate-800 transition ${
+                                    isSelected
+                                      ? "bg-teal-100 ring-2 ring-teal-400"
+                                      : "hover:bg-emerald-100/60"
+                                  }`}
+                                  onClick={() =>
+                                    handleAthleteSelection(
+                                      team.id,
+                                      "goalkeepers",
+                                      goalkeeper.id,
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  <span>{goalkeeper.participantName}</span>
+                                  <span className="text-xs text-amber-700">
+                                    {getParticipantLevelVisual(
+                                      goalkeeper.participantLevel,
+                                    )}
+                                  </span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       ) : null}
@@ -1366,7 +1595,12 @@ export function TeamDrawModule({
         ) : null}
 
         {drawnAt && !isDrawing && matchFlow && currentMatch ? (
-          <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-4 sm:p-5">
+          <div
+            ref={matchCardRef}
+            className={`space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-4 sm:p-5 ${
+              isMatchFullscreen ? "h-full overflow-y-auto" : ""
+            }`}
+          >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
@@ -1399,6 +1633,25 @@ export function TeamDrawModule({
                   value={scoreToWin}
                 />
               </label>
+
+              <Button
+                className="sm:self-end"
+                onClick={() => void toggleMatchFullscreen()}
+                type="button"
+                variant="outline"
+              >
+                {isMatchFullscreen ? (
+                  <>
+                    <Minimize2 className="h-4 w-4" />
+                    Sair da tela cheia
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-4 w-4" />
+                    Tela cheia
+                  </>
+                )}
+              </Button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_auto_1fr]">
@@ -1415,17 +1668,19 @@ export function TeamDrawModule({
                     onClick={() => handlePointChange("home", -1)}
                     type="button"
                     variant="outline"
+                    aria-label="Remover ponto do time da casa"
                   >
                     <Minus className="h-4 w-4" />
-                    -1
+                    <span className="hidden sm:inline">-1</span>
                   </Button>
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
                     onClick={() => handlePointChange("home", 1)}
                     type="button"
+                    aria-label="Adicionar ponto ao time da casa"
                   >
                     <Plus className="h-4 w-4" />
-                    +1
+                    <span className="hidden sm:inline">+1</span>
                   </Button>
                 </div>
               </div>
@@ -1449,23 +1704,33 @@ export function TeamDrawModule({
                     onClick={() => handlePointChange("away", -1)}
                     type="button"
                     variant="outline"
+                    aria-label="Remover ponto do time visitante"
                   >
                     <Minus className="h-4 w-4" />
-                    -1
+                    <span className="hidden sm:inline">-1</span>
                   </Button>
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
                     onClick={() => handlePointChange("away", 1)}
                     type="button"
+                    aria-label="Adicionar ponto ao time visitante"
                   >
                     <Plus className="h-4 w-4" />
-                    +1
+                    <span className="hidden sm:inline">+1</span>
                   </Button>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setSelectedSwapAthleteKey("")}
+                type="button"
+                variant="outline"
+                disabled={!selectedSwapAthleteKey}
+              >
+                Limpar seleção de atleta
+              </Button>
               <Button
                 onClick={handleResultsWhatsappExport}
                 type="button"
@@ -1511,6 +1776,11 @@ export function TeamDrawModule({
                 Zerar placar atual
               </Button>
             </div>
+
+            <p className="text-xs text-slate-500">
+              Para trocar atletas manualmente, clique em um atleta em qualquer
+              time e depois clique em outro atleta de outro time.
+            </p>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
