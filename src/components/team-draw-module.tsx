@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   Copy,
   Maximize2,
   MessageCircle,
@@ -307,6 +308,7 @@ export function TeamDrawModule({
     null,
   );
   const [isMatchFullscreen, setIsMatchFullscreen] = useState(false);
+  const [isScoreboardInverted, setIsScoreboardInverted] = useState(false);
   const [selectedSwapAthleteKey, setSelectedSwapAthleteKey] = useState("");
   const [dismissedWinnerKey, setDismissedWinnerKey] = useState<string | null>(
     null,
@@ -748,6 +750,7 @@ export function TeamDrawModule({
     setMatchFlow(null);
     setMatchScores({ home: 0, away: 0 });
     setMatchHistory([]);
+    setIsScoreboardInverted(false);
     setShowNewDrawModal(false);
     setSelectedSwapAthleteKey("");
   };
@@ -1690,30 +1693,71 @@ export function TeamDrawModule({
               </Button>
             </div>
 
+            <div className="flex justify-center lg:hidden">
+              <Button
+                onClick={() => setIsScoreboardInverted((current) => !current)}
+                type="button"
+                variant="outline"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                Inverter lados
+              </Button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_auto_1fr]">
-              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-3 text-center sm:p-4">
+              <div
+                className={`rounded-2xl border p-3 text-center sm:p-4 ${
+                  isScoreboardInverted
+                    ? "border-sky-100 bg-sky-50/70"
+                    : "border-teal-100 bg-teal-50/70"
+                }`}
+              >
                 <p className="text-sm font-semibold text-slate-700">
-                  {currentMatch.homeTeam.name}
+                  {isScoreboardInverted
+                    ? currentMatch.awayTeam.name
+                    : currentMatch.homeTeam.name}
                 </p>
-                <p className="mt-2 text-4xl font-black tabular-nums text-teal-800 sm:text-5xl">
-                  {matchScores.home}
+                <p
+                  className={`mt-2 text-4xl font-black tabular-nums sm:text-5xl ${
+                    isScoreboardInverted ? "text-sky-800" : "text-teal-800"
+                  }`}
+                >
+                  {isScoreboardInverted ? matchScores.away : matchScores.home}
                 </p>
                 <div className="mt-4 flex justify-center gap-2">
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
-                    onClick={() => handlePointChange("home", -1)}
+                    onClick={() =>
+                      handlePointChange(
+                        isScoreboardInverted ? "away" : "home",
+                        -1,
+                      )
+                    }
                     type="button"
                     variant="outline"
-                    aria-label="Remover ponto do time da casa"
+                    aria-label={
+                      isScoreboardInverted
+                        ? "Remover ponto do time visitante"
+                        : "Remover ponto do time da casa"
+                    }
                   >
                     <Minus className="h-4 w-4" />
                     <span className="hidden sm:inline">-1</span>
                   </Button>
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
-                    onClick={() => handlePointChange("home", 1)}
+                    onClick={() =>
+                      handlePointChange(
+                        isScoreboardInverted ? "away" : "home",
+                        1,
+                      )
+                    }
                     type="button"
-                    aria-label="Adicionar ponto ao time da casa"
+                    aria-label={
+                      isScoreboardInverted
+                        ? "Adicionar ponto ao time visitante"
+                        : "Adicionar ponto ao time da casa"
+                    }
                   >
                     <Plus className="h-4 w-4" />
                     <span className="hidden sm:inline">+1</span>
@@ -1721,35 +1765,73 @@ export function TeamDrawModule({
                 </div>
               </div>
 
-              <div className="hidden items-center justify-center lg:flex">
+              <div className="hidden flex-col items-center justify-center gap-2 lg:flex">
+                <Button
+                  onClick={() => setIsScoreboardInverted((current) => !current)}
+                  type="button"
+                  variant="outline"
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Inverter lados
+                </Button>
                 <div className="rounded-full bg-slate-100 p-3 text-slate-500">
                   <Swords className="h-5 w-5" />
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-center sm:p-4">
+              <div
+                className={`rounded-2xl border p-3 text-center sm:p-4 ${
+                  isScoreboardInverted
+                    ? "border-teal-100 bg-teal-50/70"
+                    : "border-sky-100 bg-sky-50/70"
+                }`}
+              >
                 <p className="text-sm font-semibold text-slate-700">
-                  {currentMatch.awayTeam.name}
+                  {isScoreboardInverted
+                    ? currentMatch.homeTeam.name
+                    : currentMatch.awayTeam.name}
                 </p>
-                <p className="mt-2 text-4xl font-black tabular-nums text-sky-800 sm:text-5xl">
-                  {matchScores.away}
+                <p
+                  className={`mt-2 text-4xl font-black tabular-nums sm:text-5xl ${
+                    isScoreboardInverted ? "text-teal-800" : "text-sky-800"
+                  }`}
+                >
+                  {isScoreboardInverted ? matchScores.home : matchScores.away}
                 </p>
                 <div className="mt-4 flex justify-center gap-2">
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
-                    onClick={() => handlePointChange("away", -1)}
+                    onClick={() =>
+                      handlePointChange(
+                        isScoreboardInverted ? "home" : "away",
+                        -1,
+                      )
+                    }
                     type="button"
                     variant="outline"
-                    aria-label="Remover ponto do time visitante"
+                    aria-label={
+                      isScoreboardInverted
+                        ? "Remover ponto do time da casa"
+                        : "Remover ponto do time visitante"
+                    }
                   >
                     <Minus className="h-4 w-4" />
                     <span className="hidden sm:inline">-1</span>
                   </Button>
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
-                    onClick={() => handlePointChange("away", 1)}
+                    onClick={() =>
+                      handlePointChange(
+                        isScoreboardInverted ? "home" : "away",
+                        1,
+                      )
+                    }
                     type="button"
-                    aria-label="Adicionar ponto ao time visitante"
+                    aria-label={
+                      isScoreboardInverted
+                        ? "Adicionar ponto ao time da casa"
+                        : "Adicionar ponto ao time visitante"
+                    }
                   >
                     <Plus className="h-4 w-4" />
                     <span className="hidden sm:inline">+1</span>
