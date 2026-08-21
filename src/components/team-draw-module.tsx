@@ -1824,7 +1824,7 @@ export function TeamDrawModule({
                     }
                   >
                     <Minus className="h-4 w-4" />
-                    <span className="hidden sm:inline">-1</span>
+                    <span className="hidden sm:inline"></span>
                   </Button>
                   <Button
                     className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
@@ -1842,7 +1842,7 @@ export function TeamDrawModule({
                     }
                   >
                     <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">+1</span>
+                    <span className="hidden sm:inline"></span>
                   </Button>
                 </div>
               </div>
