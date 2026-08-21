@@ -289,6 +289,20 @@ export function TeamDrawModule({
   >(null);
   const [hasLoadedPersistedState, setHasLoadedPersistedState] = useState(false);
   const { addToast, removeToast, toasts } = useToast();
+
+  const persistTeamDrawState = (
+    payload: PersistedTeamDrawState,
+    options?: { keepalive?: boolean },
+  ) => {
+    void fetch(`/api/dashboard/rachas/${rachaId}/team-draw-state`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      keepalive: options?.keepalive,
+    });
+  };
   const linePlayers = useMemo(
     () =>
       modality === "FUTEBOL"
@@ -637,13 +651,7 @@ export function TeamDrawModule({
         })),
       };
 
-      void fetch(`/api/dashboard/rachas/${rachaId}/team-draw-state`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      persistTeamDrawState(payload);
     }, 350);
 
     return () => {
@@ -666,6 +674,7 @@ export function TeamDrawModule({
 
   const startNewDraw = () => {
     const nextSeed = Date.now();
+    const drawnAtNow = new Date();
     const nextTeams = drawBalancedTeams({
       participants: enrollments,
       teamCount,
@@ -673,9 +682,25 @@ export function TeamDrawModule({
       seed: nextSeed,
     });
 
+    persistTeamDrawState(
+      {
+        seed: nextSeed,
+        teamCount,
+        drawnAt: drawnAtNow.toISOString(),
+        scoreToWin,
+        matchFlow: {
+          version: 1,
+          flow: null,
+          drawnTeams: nextTeams,
+        },
+        matchHistory: [],
+      },
+      { keepalive: true },
+    );
+
     setSeed(nextSeed);
     setPersistedDrawTeams(nextTeams);
-    setDrawnAt(new Date());
+    setDrawnAt(drawnAtNow);
     setRevealedTeamCount(0);
     setExportFormat(null);
     setIsDrawing(true);
