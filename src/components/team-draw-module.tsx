@@ -154,7 +154,8 @@ function advanceMatchFlow(
     return {
       round: currentFlow.round + 1,
       current: [nextHomeTeamId, nextAwayTeamId],
-      waiting: [...remainingWaiting, loserTeamId, winnerTeamId],
+      // O time que saiu por 2 vitórias seguidas volta antes do último perdedor.
+      waiting: [...remainingWaiting, winnerTeamId, loserTeamId],
       streakTeamId: null,
       streakCount: 0,
       lastAction: "double-win-rotation",

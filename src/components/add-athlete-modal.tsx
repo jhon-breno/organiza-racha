@@ -105,7 +105,7 @@ export function AddAthleteModal({ rachaId, modality }: AddAthleteModalProps) {
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const users = await searchUsersByPhoneAction(searchQuery);
+        const users = await searchUsersByPhoneAction(searchQuery, rachaId);
         setSearchResults(users);
         setHasSearched(true);
       } catch (err) {

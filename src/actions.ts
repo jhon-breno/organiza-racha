@@ -2099,9 +2099,32 @@ export async function joinRachaAction(formData: FormData) {
   );
 }
 
-export async function searchUsersByPhoneAction(query: string) {
+export async function searchUsersByPhoneAction(
+  query: string,
+  rachaId?: string,
+) {
   const user = await requireUser("/dashboard");
   if (!user) return [];
+
+  const normalizedRachaId = rachaId?.trim();
+
+  if (normalizedRachaId) {
+    const targetRacha = await prisma.racha.findUnique({
+      where: { id: normalizedRachaId },
+      select: { id: true, organizerId: true },
+    });
+
+    if (
+      !targetRacha ||
+      !(await canUserManageRacha({
+        userId: user.id,
+        rachaId: targetRacha.id,
+        organizerId: targetRacha.organizerId,
+      }))
+    ) {
+      return [];
+    }
+  }
 
   const rawQuery = query.trim();
   if (!rawQuery || rawQuery.length < 2) {
@@ -2122,6 +2145,15 @@ export async function searchUsersByPhoneAction(query: string) {
   const users = await prisma.user.findMany({
     where: {
       OR: ORConditions,
+      ...(normalizedRachaId
+        ? {
+            enrollments: {
+              none: {
+                rachaId: normalizedRachaId,
+              },
+            },
+          }
+        : {}),
     },
     select: {
       id: true,
