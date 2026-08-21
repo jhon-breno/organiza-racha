@@ -2,6 +2,7 @@ import { ParticipantStatus } from "@prisma/client";
 import { Shuffle } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { AddAthleteModal } from "@/components/add-athlete-modal";
 import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
 import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { EnrollmentManagement } from "@/components/enrollment-management";
@@ -164,6 +165,7 @@ export default async function EditRachaPage({
           </h1>
         </div>
         <div className="flex gap-3">
+          <AddAthleteModal modality={racha.modality} rachaId={racha.id} />
           <Button asChild href={`/dashboard/rachas/${racha.id}/sorteio`}>
             <Shuffle className="h-4 w-4" />
             Sortear times
