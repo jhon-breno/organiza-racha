@@ -1267,7 +1267,7 @@ export function TeamDrawModule({
           </div>
         ) : null}
 
-        {winnerPrompt ? (
+        {winnerPrompt && !isMatchFullscreen ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
             <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
@@ -1597,10 +1597,46 @@ export function TeamDrawModule({
         {drawnAt && !isDrawing && matchFlow && currentMatch ? (
           <div
             ref={matchCardRef}
-            className={`space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-4 sm:p-5 ${
+            className={`relative space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-4 sm:p-5 ${
               isMatchFullscreen ? "h-full overflow-y-auto" : ""
             }`}
           >
+            {winnerPrompt && isMatchFullscreen ? (
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+                <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                    Partida encerrada
+                  </p>
+                  <h4 className="mt-2 text-xl font-black text-slate-950">
+                    {winnerPrompt.winnerTeamName} venceu!
+                  </h4>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    Confirme a vitória para avançar o próximo confronto ou
+                    revise o placar antes de confirmar.
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap justify-end gap-2">
+                    <Button
+                      onClick={() => {
+                        setWinnerPrompt(null);
+                        setDismissedWinnerKey(currentWinnerKey);
+                      }}
+                      type="button"
+                      variant="outline"
+                    >
+                      Rever placar
+                    </Button>
+                    <Button
+                      onClick={() => concludeMatch(winnerPrompt.winnerSlot)}
+                      type="button"
+                    >
+                      Confirmar vitória do {winnerPrompt.winnerTeamName}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
