@@ -70,6 +70,11 @@ type MatchHistoryItem = {
   createdAt: Date;
 };
 
+type WinnerPromptState = {
+  winnerSlot: "home" | "away";
+  winnerTeamName: string;
+};
+
 type PersistedTeamDrawState = {
   seed: number;
   teamCount: number;
@@ -283,6 +288,12 @@ export function TeamDrawModule({
     home: 0,
     away: 0,
   });
+  const [winnerPrompt, setWinnerPrompt] = useState<WinnerPromptState | null>(
+    null,
+  );
+  const [dismissedWinnerKey, setDismissedWinnerKey] = useState<string | null>(
+    null,
+  );
   const [matchHistory, setMatchHistory] = useState<MatchHistoryItem[]>([]);
   const [persistedDrawTeams, setPersistedDrawTeams] = useState<
     DrawTeam[] | null
@@ -779,6 +790,8 @@ export function TeamDrawModule({
 
   const handleResetCurrentMatch = () => {
     setMatchScores({ home: 0, away: 0 });
+    setWinnerPrompt(null);
+    setDismissedWinnerKey(null);
   };
 
   const concludeMatch = (
@@ -820,6 +833,8 @@ export function TeamDrawModule({
     ]);
     setMatchFlow(nextFlow);
     setMatchScores({ home: 0, away: 0 });
+    setWinnerPrompt(null);
+    setDismissedWinnerKey(null);
 
     addToast(
       `${winnerName} venceu por ${scores.home} x ${scores.away}.`,
@@ -863,9 +878,53 @@ export function TeamDrawModule({
     if (!winnerSlot) {
       return;
     }
-
-    concludeMatch(winnerSlot, computedScores);
   };
+
+  const currentWinningSlot = currentMatch
+    ? getWinningSlot(matchScores, scoreToWin)
+    : null;
+  const currentWinnerTeamName =
+    currentMatch && currentWinningSlot
+      ? currentWinningSlot === "home"
+        ? currentMatch.homeTeam.name
+        : currentMatch.awayTeam.name
+      : null;
+  const currentWinnerKey =
+    currentMatch && currentWinningSlot
+      ? `${matchFlow?.round ?? 0}-${currentMatch.homeTeam.id}-${currentMatch.awayTeam.id}-${currentWinningSlot}-${matchScores.home}-${matchScores.away}`
+      : null;
+
+  useEffect(() => {
+    if (!currentWinningSlot || !currentWinnerTeamName || !currentWinnerKey) {
+      setWinnerPrompt(null);
+      setDismissedWinnerKey(null);
+      return;
+    }
+
+    if (dismissedWinnerKey === currentWinnerKey) {
+      return;
+    }
+
+    setWinnerPrompt((current) => {
+      if (
+        current &&
+        current.winnerSlot === currentWinningSlot &&
+        current.winnerTeamName === currentWinnerTeamName
+      ) {
+        return current;
+      }
+
+      return {
+        winnerSlot: currentWinningSlot,
+        winnerTeamName: currentWinnerTeamName,
+      };
+    });
+  }, [
+    currentWinnerKey,
+    currentWinnerTeamName,
+    currentWinningSlot,
+    dismissedWinnerKey,
+  ]);
 
   const hasPersistedOrDrawnTeams = drawnAt && teams.length >= 2;
 
@@ -1021,6 +1080,42 @@ export function TeamDrawModule({
                 </Button>
                 <Button onClick={startNewDraw} type="button" variant="danger">
                   Confirmar e sortear novamente
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {winnerPrompt ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+            <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                Partida encerrada
+              </p>
+              <h4 className="mt-2 text-xl font-black text-slate-950">
+                {winnerPrompt.winnerTeamName} venceu!
+              </h4>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Confirme a vitória para avançar o próximo confronto ou revise o
+                placar antes de confirmar.
+              </p>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-2">
+                <Button
+                  onClick={() => {
+                    setWinnerPrompt(null);
+                    setDismissedWinnerKey(currentWinnerKey);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Rever placar
+                </Button>
+                <Button
+                  onClick={() => concludeMatch(winnerPrompt.winnerSlot)}
+                  type="button"
+                >
+                  Confirmar vitória do {winnerPrompt.winnerTeamName}
                 </Button>
               </div>
             </div>
@@ -1306,17 +1401,17 @@ export function TeamDrawModule({
               </label>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr]">
-              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4 text-center">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_auto_1fr]">
+              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-3 text-center sm:p-4">
                 <p className="text-sm font-semibold text-slate-700">
                   {currentMatch.homeTeam.name}
                 </p>
-                <p className="mt-2 text-5xl font-black tabular-nums text-teal-800">
+                <p className="mt-2 text-4xl font-black tabular-nums text-teal-800 sm:text-5xl">
                   {matchScores.home}
                 </p>
                 <div className="mt-4 flex justify-center gap-2">
                   <Button
-                    className="h-11 min-w-20"
+                    className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
                     onClick={() => handlePointChange("home", -1)}
                     type="button"
                     variant="outline"
@@ -1325,7 +1420,7 @@ export function TeamDrawModule({
                     -1
                   </Button>
                   <Button
-                    className="h-11 min-w-20"
+                    className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
                     onClick={() => handlePointChange("home", 1)}
                     type="button"
                   >
@@ -1341,16 +1436,16 @@ export function TeamDrawModule({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-center">
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-center sm:p-4">
                 <p className="text-sm font-semibold text-slate-700">
                   {currentMatch.awayTeam.name}
                 </p>
-                <p className="mt-2 text-5xl font-black tabular-nums text-sky-800">
+                <p className="mt-2 text-4xl font-black tabular-nums text-sky-800 sm:text-5xl">
                   {matchScores.away}
                 </p>
                 <div className="mt-4 flex justify-center gap-2">
                   <Button
-                    className="h-11 min-w-20"
+                    className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
                     onClick={() => handlePointChange("away", -1)}
                     type="button"
                     variant="outline"
@@ -1359,7 +1454,7 @@ export function TeamDrawModule({
                     -1
                   </Button>
                   <Button
-                    className="h-11 min-w-20"
+                    className="h-10 min-w-14 px-2 text-sm sm:h-11 sm:min-w-20"
                     onClick={() => handlePointChange("away", 1)}
                     type="button"
                   >
