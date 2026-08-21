@@ -85,7 +85,17 @@ export async function GET(
     },
   });
 
-  return NextResponse.json({ state });
+  if (!state) {
+    return NextResponse.json({ state: null });
+  }
+
+  return NextResponse.json({
+    state: {
+      ...state,
+      // BigInt cannot be serialized directly in JSON responses.
+      seed: state.seed.toString(),
+    },
+  });
 }
 
 export async function PUT(
