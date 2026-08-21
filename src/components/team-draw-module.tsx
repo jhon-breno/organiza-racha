@@ -1444,7 +1444,7 @@ export function TeamDrawModule({
                               return (
                                 <button
                                   key={setter.id}
-                                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-slate-800 transition ${
+                                  className={`flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-slate-800 transition ${
                                     isSelected
                                       ? "bg-teal-100 ring-2 ring-teal-400"
                                       : "hover:bg-sky-100/60"
@@ -1458,18 +1458,22 @@ export function TeamDrawModule({
                                   }
                                   type="button"
                                 >
-                                  <span className="flex items-center gap-1.5 font-medium">
-                                    {setter.participantName}
-                                    {isFemale ? (
-                                      <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
-                                        Feminino
-                                      </span>
-                                    ) : null}
+                                  <span className="min-w-0 flex-1">
+                                    <span className="flex flex-wrap items-center gap-1.5 font-medium leading-5 break-words">
+                                      {setter.participantName}
+                                      {isFemale ? (
+                                        <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
+                                          Feminino
+                                        </span>
+                                      ) : null}
+                                    </span>
                                   </span>
-                                  <span className="text-xs text-amber-700">
-                                    {getParticipantLevelVisual(
-                                      setter.participantLevel,
-                                    )}
+                                  <span className="shrink-0 text-right text-xs text-amber-700">
+                                    <span className="font-semibold tracking-tight">
+                                      {getParticipantLevelVisual(
+                                        setter.participantLevel,
+                                      )}
+                                    </span>
                                   </span>
                                 </button>
                               );
@@ -1505,9 +1509,9 @@ export function TeamDrawModule({
                               type="button"
                             >
                               <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-950">
-                                    <span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold leading-5 text-slate-950">
+                                    <span className="break-words">
                                       {participantIndex + 1}.{" "}
                                       {participant.participantName}
                                     </span>
@@ -1521,7 +1525,7 @@ export function TeamDrawModule({
                                     {participant.participantPosition}
                                   </p>
                                 </div>
-                                <div className="text-right text-xs text-amber-700">
+                                <div className="shrink-0 text-right text-xs text-amber-700">
                                   <p className="font-semibold">
                                     {getParticipantLevelVisual(
                                       participant.participantLevel,
@@ -1553,7 +1557,7 @@ export function TeamDrawModule({
                               return (
                                 <button
                                   key={goalkeeper.id}
-                                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-slate-800 transition ${
+                                  className={`flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-slate-800 transition ${
                                     isSelected
                                       ? "bg-teal-100 ring-2 ring-teal-400"
                                       : "hover:bg-emerald-100/60"
@@ -1567,11 +1571,15 @@ export function TeamDrawModule({
                                   }
                                   type="button"
                                 >
-                                  <span>{goalkeeper.participantName}</span>
-                                  <span className="text-xs text-amber-700">
-                                    {getParticipantLevelVisual(
-                                      goalkeeper.participantLevel,
-                                    )}
+                                  <span className="min-w-0 flex-1 break-words font-medium leading-5">
+                                    {goalkeeper.participantName}
+                                  </span>
+                                  <span className="shrink-0 text-right text-xs text-amber-700">
+                                    <span className="font-semibold tracking-tight">
+                                      {getParticipantLevelVisual(
+                                        goalkeeper.participantLevel,
+                                      )}
+                                    </span>
                                   </span>
                                 </button>
                               );
