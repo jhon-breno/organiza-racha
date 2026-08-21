@@ -26,6 +26,8 @@ import {
   credentialsSignInSchema,
   enrollmentSchema,
   addOrganizerUserSchema,
+  adminDeleteUserSchema,
+  adminUpdateUserProfileSchema,
   adminSetUserPasswordSchema,
   forgotPasswordSchema,
   organizerDataSettingsSchema,
@@ -1344,6 +1346,201 @@ export async function adminSetUserPasswordAction(formData: FormData) {
       "/dashboard/usuarios",
       "success",
       `Senha de ${targetUser.name ?? "usuário"} redefinida. No próximo login ele deverá criar uma nova senha.`,
+    ),
+  );
+}
+
+export async function adminUpdateUserProfileAction(formData: FormData) {
+  await requireSuperAdminUser("/dashboard/usuarios");
+
+  const parsed = adminUpdateUserProfileSchema.safeParse({
+    userId: getStringValue(formData, "userId"),
+    name: getStringValue(formData, "name"),
+    nickname: getStringValue(formData, "nickname"),
+    email: getStringValue(formData, "email"),
+    phone: getStringValue(formData, "phone"),
+    image: getStringValue(formData, "image"),
+    isFemale:
+      formData.get("isFemale") === "true" ||
+      formData.get("isFemale") === "on" ||
+      formData.get("isFemale") === "1",
+    mustChangePassword:
+      formData.get("mustChangePassword") === "true" ||
+      formData.get("mustChangePassword") === "on" ||
+      formData.get("mustChangePassword") === "1",
+    pixKey: getStringValue(formData, "pixKey"),
+    pixBankName: getStringValue(formData, "pixBankName"),
+    pixHolderName: getStringValue(formData, "pixHolderName"),
+  });
+
+  if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível atualizar o usuário.",
+        { field },
+      ),
+    );
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: parsed.data.userId },
+    select: { id: true, name: true, email: true, phone: true },
+  });
+
+  if (!targetUser) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        "Usuário não encontrado.",
+      ),
+    );
+  }
+
+  const nextEmail = parsed.data.email
+    ? normalizeEmailValue(parsed.data.email)
+    : null;
+  const nextPhone = parsed.data.phone
+    ? normalizePhoneValue(parsed.data.phone)
+    : null;
+
+  if (nextEmail) {
+    const emailInUse = await prisma.user.findFirst({
+      where: {
+        email: nextEmail,
+        NOT: { id: targetUser.id },
+      },
+      select: { id: true },
+    });
+
+    if (emailInUse) {
+      redirect(
+        buildMessageUrl(
+          "/dashboard/usuarios",
+          "error",
+          "Já existe outro usuário com este e-mail.",
+        ),
+      );
+    }
+  }
+
+  if (nextPhone) {
+    const phoneInUse = await prisma.user.findFirst({
+      where: {
+        phone: nextPhone,
+        NOT: { id: targetUser.id },
+      },
+      select: { id: true },
+    });
+
+    if (phoneInUse) {
+      redirect(
+        buildMessageUrl(
+          "/dashboard/usuarios",
+          "error",
+          "Já existe outro usuário com este telefone.",
+        ),
+      );
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: targetUser.id },
+    data: {
+      name: parsed.data.name,
+      nickname: parsed.data.nickname || null,
+      email: nextEmail,
+      phone: nextPhone,
+      image: parsed.data.image || null,
+      isFemale: Boolean(parsed.data.isFemale),
+      mustChangePassword: Boolean(parsed.data.mustChangePassword),
+      pixKey: parsed.data.pixKey || null,
+      pixBankName: parsed.data.pixBankName || null,
+      pixHolderName: parsed.data.pixHolderName || null,
+    },
+  });
+
+  await prisma.enrollment.updateMany({
+    where: { userId: targetUser.id },
+    data: {
+      isFemale: Boolean(parsed.data.isFemale),
+    },
+  });
+
+  revalidatePath("/dashboard/usuarios");
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      "/dashboard/usuarios",
+      "success",
+      `Dados de ${parsed.data.name} atualizados com sucesso.`,
+    ),
+  );
+}
+
+export async function adminDeleteUserAction(formData: FormData) {
+  const adminUser = await requireSuperAdminUser("/dashboard/usuarios");
+
+  const parsed = adminDeleteUserSchema.safeParse({
+    userId: getStringValue(formData, "userId"),
+    confirmationText: getStringValue(formData, "confirmationText"),
+  });
+
+  if (!parsed.success) {
+    const field = getFirstIssueFieldName(parsed.error.issues);
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        parsed.error.issues[0]?.message ??
+          "Não foi possível deletar o usuário.",
+        { field },
+      ),
+    );
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: parsed.data.userId },
+    select: { id: true, name: true, email: true },
+  });
+
+  if (!targetUser) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        "Usuário não encontrado.",
+      ),
+    );
+  }
+
+  if (targetUser.id === adminUser.id || isSuperAdminEmail(targetUser.email)) {
+    redirect(
+      buildMessageUrl(
+        "/dashboard/usuarios",
+        "error",
+        "Este usuário não pode ser deletado por segurança.",
+      ),
+    );
+  }
+
+  await prisma.user.delete({
+    where: { id: targetUser.id },
+  });
+
+  revalidatePath("/dashboard/usuarios");
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      "/dashboard/usuarios",
+      "success",
+      `Usuário ${targetUser.name ?? "selecionado"} deletado com sucesso.`,
     ),
   );
 }

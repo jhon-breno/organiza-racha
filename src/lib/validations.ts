@@ -447,6 +447,60 @@ export const adminSetUserPasswordSchema = z
     }
   });
 
+export const adminUpdateUserProfileSchema = z.object({
+  userId: z.string().trim().min(1, "Usuário inválido."),
+  name: z.string().trim().min(2, "Informe o nome com pelo menos 2 caracteres."),
+  nickname: z
+    .string()
+    .trim()
+    .max(60, "O apelido pode ter no máximo 60 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  email: z.string().trim().optional().or(z.literal("")),
+  phone: z.string().trim().optional().or(z.literal("")),
+  image: z
+    .string()
+    .trim()
+    .url("Informe uma URL válida para a foto.")
+    .optional()
+    .or(z.literal("")),
+  isFemale: z.coerce.boolean().optional(),
+  mustChangePassword: z.coerce.boolean().optional(),
+  pixKey: z
+    .string()
+    .trim()
+    .max(120, "A chave PIX pode ter no máximo 120 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  pixBankName: z
+    .string()
+    .trim()
+    .max(120, "O nome do banco pode ter no máximo 120 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  pixHolderName: z
+    .string()
+    .trim()
+    .max(120, "O nome do titular pode ter no máximo 120 caracteres.")
+    .optional()
+    .or(z.literal("")),
+});
+
+export const adminDeleteUserSchema = z
+  .object({
+    userId: z.string().trim().min(1, "Usuário inválido."),
+    confirmationText: z.string().trim().min(1, "Confirmação obrigatória."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.confirmationText !== "DELETAR") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmationText"],
+        message: "Digite DELETAR para confirmar.",
+      });
+    }
+  });
+
 export const recoverIdentifierSchema = z.object({
   name: z.string().trim().min(2, "Informe seu nome."),
   knownIdentifier: z.string().trim().min(3, "Informe e-mail ou telefone."),

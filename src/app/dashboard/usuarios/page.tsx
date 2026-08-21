@@ -1,21 +1,25 @@
 import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { adminSetUserPasswordAction } from "@/actions";
 import { FlashMessage } from "@/components/flash-message";
-import { SubmitButton } from "@/components/submit-button";
+import { GlobalUserManagementActions } from "@/components/global-user-management-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
-import { buildMessageUrl, formatDateTimeShort, formatPhone } from "@/lib/utils";
+import { buildMessageUrl } from "@/lib/utils";
 
 type SearchParams = Promise<{
   status?: string;
   message?: string;
   q?: string;
+  gender?: string;
+  passwordState?: string;
+  phoneState?: string;
+  emailState?: string;
 }>;
 
 export default async function DashboardUsersPage({
@@ -43,31 +47,67 @@ export default async function DashboardUsersPage({
 
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
+  const genderFilter = params.gender ?? "all";
+  const passwordStateFilter = params.passwordState ?? "all";
+  const phoneStateFilter = params.phoneState ?? "all";
+  const emailStateFilter = params.emailState ?? "all";
+
+  const where: Prisma.UserWhereInput = {};
+
+  if (query) {
+    where.OR = [
+      {
+        name: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      {
+        nickname: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      {
+        email: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      {
+        phone: {
+          contains: query.replace(/\D/g, ""),
+        },
+      },
+    ];
+  }
+
+  if (genderFilter === "female") {
+    where.isFemale = true;
+  } else if (genderFilter === "male") {
+    where.isFemale = false;
+  }
+
+  if (passwordStateFilter === "pending") {
+    where.mustChangePassword = true;
+  } else if (passwordStateFilter === "regular") {
+    where.mustChangePassword = false;
+  }
+
+  if (phoneStateFilter === "with-phone") {
+    where.phone = { not: null };
+  } else if (phoneStateFilter === "without-phone") {
+    where.phone = null;
+  }
+
+  if (emailStateFilter === "with-email") {
+    where.email = { not: null };
+  } else if (emailStateFilter === "without-email") {
+    where.email = null;
+  }
 
   const users = await prisma.user.findMany({
-    where: query
-      ? {
-          OR: [
-            {
-              name: {
-                contains: query,
-                mode: "insensitive",
-              },
-            },
-            {
-              email: {
-                contains: query,
-                mode: "insensitive",
-              },
-            },
-            {
-              phone: {
-                contains: query.replace(/\D/g, ""),
-              },
-            },
-          ],
-        }
-      : undefined,
+    where,
     select: {
       id: true,
       name: true,
@@ -115,14 +155,57 @@ export default async function DashboardUsersPage({
       <FlashMessage status={params.status} message={params.message} />
 
       <Card className="space-y-4">
-        <form className="flex flex-col gap-3 sm:flex-row" method="get">
+        <form
+          className="grid gap-3 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]"
+          method="get"
+        >
           <Input
             defaultValue={query}
             name="q"
-            placeholder="Buscar por nome, e-mail ou telefone"
+            placeholder="Buscar por nome, apelido, e-mail ou telefone"
           />
+          <select
+            className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+            defaultValue={genderFilter}
+            name="gender"
+          >
+            <option value="all">Gênero: todos</option>
+            <option value="female">Gênero: mulher</option>
+            <option value="male">Gênero: não mulher</option>
+          </select>
+          <select
+            className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+            defaultValue={passwordStateFilter}
+            name="passwordState"
+          >
+            <option value="all">Senha: todos</option>
+            <option value="pending">Senha: troca pendente</option>
+            <option value="regular">Senha: regular</option>
+          </select>
+          <select
+            className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+            defaultValue={phoneStateFilter}
+            name="phoneState"
+          >
+            <option value="all">Telefone: todos</option>
+            <option value="with-phone">Com telefone</option>
+            <option value="without-phone">Sem telefone</option>
+          </select>
+          <select
+            className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+            defaultValue={emailStateFilter}
+            name="emailState"
+          >
+            <option value="all">E-mail: todos</option>
+            <option value="with-email">Com e-mail</option>
+            <option value="without-email">Sem e-mail</option>
+          </select>
           <Button type="submit">Buscar</Button>
-          {query ? (
+          {query ||
+          genderFilter !== "all" ||
+          passwordStateFilter !== "all" ||
+          phoneStateFilter !== "all" ||
+          emailStateFilter !== "all" ? (
             <Button asChild type="button" variant="ghost">
               <Link href="/dashboard/usuarios">Limpar</Link>
             </Button>
@@ -141,127 +224,17 @@ export default async function DashboardUsersPage({
         ) : (
           <div className="grid gap-4">
             {users.map((user) => (
-              <div
+              <GlobalUserManagementActions
                 key={user.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-lg font-bold text-slate-950">
-                      {user.name || "Sem nome"}
-                    </p>
-                    <p className="text-xs text-slate-500">ID: {user.id}</p>
-                    <p className="text-sm text-slate-600">
-                      Apelido: {user.nickname || "Sem apelido"}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {user.email || "Sem e-mail"}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {user.phone ? formatPhone(user.phone) : "Sem telefone"}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      className={
-                        user.mustChangePassword
-                          ? "bg-amber-100 text-amber-900"
-                          : "bg-emerald-100 text-emerald-800"
-                      }
-                    >
-                      {user.mustChangePassword
-                        ? "Troca de senha pendente"
-                        : "Senha regular"}
-                    </Badge>
-                    <Badge
-                      className={
-                        user.isFemale
-                          ? "bg-pink-100 text-pink-800"
-                          : "bg-slate-100 text-slate-700"
-                      }
-                    >
-                      {user.isFemale ? "Mulher: Sim" : "Mulher: Não"}
-                    </Badge>
-                    <Badge
-                      className={
-                        user.passwordHash
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-slate-100 text-slate-700"
-                      }
-                    >
-                      {user.passwordHash ? "Senha cadastrada" : "Sem senha"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
-                  <p>
-                    <span className="font-semibold">E-mail verificado:</span>{" "}
-                    {user.emailVerified
-                      ? formatDateTimeShort(user.emailVerified)
-                      : "Não"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Foto:</span>{" "}
-                    {user.image || "Não informada"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Chave PIX:</span>{" "}
-                    {user.pixKey || "Não informada"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Banco PIX:</span>{" "}
-                    {user.pixBankName || "Não informado"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Titular PIX:</span>{" "}
-                    {user.pixHolderName || "Não informado"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Reset ativo:</span>{" "}
-                    {user.passwordResetToken ? "Sim" : "Não"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Expiração reset:</span>{" "}
-                    {user.passwordResetExpires
-                      ? formatDateTimeShort(user.passwordResetExpires)
-                      : "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Criado em:</span>{" "}
-                    {formatDateTimeShort(user.createdAt)}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Atualizado em:</span>{" "}
-                    {formatDateTimeShort(user.updatedAt)}
-                  </p>
-                </div>
-
-                <form
-                  action={adminSetUserPasswordAction}
-                  className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]"
-                >
-                  <input name="userId" type="hidden" value={user.id} />
-                  <Input
-                    autoComplete="new-password"
-                    name="password"
-                    placeholder="Nova senha temporária"
-                    required
-                    type="password"
-                  />
-                  <Input
-                    autoComplete="new-password"
-                    name="confirmPassword"
-                    placeholder="Confirmar nova senha"
-                    required
-                    type="password"
-                  />
-                  <SubmitButton pendingLabel="Redefinindo...">
-                    Resetar senha
-                  </SubmitButton>
-                </form>
-              </div>
+                user={{
+                  ...user,
+                  emailVerified: user.emailVerified?.toISOString() ?? null,
+                  passwordResetExpires:
+                    user.passwordResetExpires?.toISOString() ?? null,
+                  createdAt: user.createdAt.toISOString(),
+                  updatedAt: user.updatedAt.toISOString(),
+                }}
+              />
             ))}
           </div>
         )}
