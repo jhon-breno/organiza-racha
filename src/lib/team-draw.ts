@@ -259,13 +259,18 @@ export function drawBalancedTeams({
       const teamsBelowMax = eligibleTeams.filter(
         ({ femaleCount }) => femaleCount < maxFemalePerTeam,
       );
+      const teamsWithoutWomen = eligibleTeams.filter(
+        ({ femaleCount }) => femaleCount === 0,
+      );
 
       const prioritizedTeams =
-        teamsBelowMin.length > 0
-          ? teamsBelowMin
-          : teamsBelowMax.length > 0
-            ? teamsBelowMax
-            : eligibleTeams;
+        teamsWithoutWomen.length > 0
+          ? teamsWithoutWomen
+          : teamsBelowMin.length > 0
+            ? teamsBelowMin
+            : teamsBelowMax.length > 0
+              ? teamsBelowMax
+              : eligibleTeams;
 
       prioritizedTeams.sort((left, right) => {
         if (left.femaleCount !== right.femaleCount) {

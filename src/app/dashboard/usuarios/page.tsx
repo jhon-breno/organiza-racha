@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
-import { buildMessageUrl, formatPhone } from "@/lib/utils";
+import { buildMessageUrl, formatDateTimeShort, formatPhone } from "@/lib/utils";
 
 type SearchParams = Promise<{
   status?: string;
@@ -71,9 +71,19 @@ export default async function DashboardUsersPage({
     select: {
       id: true,
       name: true,
+      nickname: true,
       email: true,
+      emailVerified: true,
       phone: true,
+      image: true,
+      isFemale: true,
       mustChangePassword: true,
+      pixKey: true,
+      pixBankName: true,
+      pixHolderName: true,
+      passwordHash: true,
+      passwordResetToken: true,
+      passwordResetExpires: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -140,6 +150,10 @@ export default async function DashboardUsersPage({
                     <p className="text-lg font-bold text-slate-950">
                       {user.name || "Sem nome"}
                     </p>
+                    <p className="text-xs text-slate-500">ID: {user.id}</p>
+                    <p className="text-sm text-slate-600">
+                      Apelido: {user.nickname || "Sem apelido"}
+                    </p>
                     <p className="text-sm text-slate-600">
                       {user.email || "Sem e-mail"}
                     </p>
@@ -148,17 +162,80 @@ export default async function DashboardUsersPage({
                     </p>
                   </div>
 
-                  <Badge
-                    className={
-                      user.mustChangePassword
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-emerald-100 text-emerald-800"
-                    }
-                  >
-                    {user.mustChangePassword
-                      ? "Troca de senha pendente"
-                      : "Senha regular"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      className={
+                        user.mustChangePassword
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-emerald-100 text-emerald-800"
+                      }
+                    >
+                      {user.mustChangePassword
+                        ? "Troca de senha pendente"
+                        : "Senha regular"}
+                    </Badge>
+                    <Badge
+                      className={
+                        user.isFemale
+                          ? "bg-pink-100 text-pink-800"
+                          : "bg-slate-100 text-slate-700"
+                      }
+                    >
+                      {user.isFemale ? "Mulher: Sim" : "Mulher: Não"}
+                    </Badge>
+                    <Badge
+                      className={
+                        user.passwordHash
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-slate-100 text-slate-700"
+                      }
+                    >
+                      {user.passwordHash ? "Senha cadastrada" : "Sem senha"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
+                  <p>
+                    <span className="font-semibold">E-mail verificado:</span>{" "}
+                    {user.emailVerified
+                      ? formatDateTimeShort(user.emailVerified)
+                      : "Não"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Foto:</span>{" "}
+                    {user.image || "Não informada"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Chave PIX:</span>{" "}
+                    {user.pixKey || "Não informada"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Banco PIX:</span>{" "}
+                    {user.pixBankName || "Não informado"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Titular PIX:</span>{" "}
+                    {user.pixHolderName || "Não informado"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Reset ativo:</span>{" "}
+                    {user.passwordResetToken ? "Sim" : "Não"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Expiração reset:</span>{" "}
+                    {user.passwordResetExpires
+                      ? formatDateTimeShort(user.passwordResetExpires)
+                      : "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Criado em:</span>{" "}
+                    {formatDateTimeShort(user.createdAt)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Atualizado em:</span>{" "}
+                    {formatDateTimeShort(user.updatedAt)}
+                  </p>
                 </div>
 
                 <form
