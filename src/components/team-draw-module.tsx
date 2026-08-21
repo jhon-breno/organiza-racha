@@ -273,6 +273,7 @@ export function TeamDrawModule({
   const [drawnAt, setDrawnAt] = useState<Date | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [revealedTeamCount, setRevealedTeamCount] = useState(0);
+  const [showNewDrawModal, setShowNewDrawModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<
     "draw-whatsapp" | "results-whatsapp" | null
   >(null);
@@ -668,17 +669,7 @@ export function TeamDrawModule({
     teams,
   ]);
 
-  const handleDraw = () => {
-    if (drawnAt) {
-      const shouldStartNewDraw = window.confirm(
-        "Ja existe um sorteio realizado. Iniciar novo sorteio vai zerar confrontos e resultados. Deseja continuar?",
-      );
-
-      if (!shouldStartNewDraw) {
-        return;
-      }
-    }
-
+  const startNewDraw = () => {
     const nextSeed = Date.now();
     const nextTeams = drawBalancedTeams({
       participants: enrollments,
@@ -696,6 +687,16 @@ export function TeamDrawModule({
     setMatchFlow(null);
     setMatchScores({ home: 0, away: 0 });
     setMatchHistory([]);
+    setShowNewDrawModal(false);
+  };
+
+  const handleDraw = () => {
+    if (drawnAt) {
+      setShowNewDrawModal(true);
+      return;
+    }
+
+    startNewDraw();
   };
 
   const currentRevealTeam =
@@ -970,6 +971,36 @@ export function TeamDrawModule({
             </Button>
           </div>
         </div>
+
+        {showNewDrawModal ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+            <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">
+                Confirmar novo sorteio
+              </p>
+              <h4 className="mt-2 text-xl font-black text-slate-950">
+                Deseja realizar um novo sorteio?
+              </h4>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Essa ação vai zerar os confrontos, placares e histórico já
+                registrados.
+              </p>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-2">
+                <Button
+                  onClick={() => setShowNewDrawModal(false)}
+                  type="button"
+                  variant="outline"
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={startNewDraw} type="button" variant="danger">
+                  Confirmar e sortear novamente
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {!drawnAt ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white/80 px-6 py-10 text-center">
