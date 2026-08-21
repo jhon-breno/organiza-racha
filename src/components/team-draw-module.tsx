@@ -75,10 +75,16 @@ type PersistedTeamDrawState = {
   teamCount: number;
   drawnAt: string;
   scoreToWin: number;
-  matchFlow: MatchFlowState | null;
+  matchFlow: unknown;
   matchHistory: Array<
     Omit<MatchHistoryItem, "createdAt"> & { createdAt: string }
   >;
+};
+
+type PersistedMatchFlowEnvelope = {
+  version: 1;
+  flow: MatchFlowState | null;
+  drawnTeams: DrawTeam[];
 };
 
 type TeamRankingItem = {
@@ -212,6 +218,46 @@ function buildResultsWhatsappMessage(input: {
   return message;
 }
 
+function isMatchFlowState(value: unknown): value is MatchFlowState {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<MatchFlowState>;
+
+  return (
+    typeof candidate.round === "number" &&
+    Array.isArray(candidate.current) &&
+    candidate.current.length === 2 &&
+    typeof candidate.current[0] === "string" &&
+    typeof candidate.current[1] === "string" &&
+    Array.isArray(candidate.waiting)
+  );
+}
+
+function isDrawTeamArray(value: unknown): value is DrawTeam[] {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every((team) => {
+    if (!team || typeof team !== "object") {
+      return false;
+    }
+
+    const candidate = team as Partial<DrawTeam>;
+
+    return (
+      typeof candidate.id === "string" &&
+      typeof candidate.name === "string" &&
+      Array.isArray(candidate.players) &&
+      Array.isArray(candidate.setters) &&
+      Array.isArray(candidate.goalkeepers) &&
+      typeof candidate.totalScore === "number"
+    );
+  });
+}
+
 export function TeamDrawModule({
   rachaId,
   rachaTitle,
@@ -237,6 +283,9 @@ export function TeamDrawModule({
     away: 0,
   });
   const [matchHistory, setMatchHistory] = useState<MatchHistoryItem[]>([]);
+  const [persistedDrawTeams, setPersistedDrawTeams] = useState<
+    DrawTeam[] | null
+  >(null);
   const [hasLoadedPersistedState, setHasLoadedPersistedState] = useState(false);
   const { addToast, removeToast, toasts } = useToast();
   const linePlayers = useMemo(
@@ -270,10 +319,14 @@ export function TeamDrawModule({
   );
 
   useEffect(() => {
-    setTeamCount(Math.min(suggestedTeamCount, maxTeamCount));
-  }, [maxTeamCount, suggestedTeamCount]);
+    if (drawnAt) {
+      return;
+    }
 
-  const teams = useMemo(
+    setTeamCount(Math.min(suggestedTeamCount, maxTeamCount));
+  }, [drawnAt, maxTeamCount, suggestedTeamCount]);
+
+  const generatedTeams = useMemo(
     () =>
       drawBalancedTeams({
         participants: enrollments,
@@ -282,6 +335,13 @@ export function TeamDrawModule({
         seed,
       }),
     [enrollments, modality, seed, teamCount],
+  );
+  const teams = useMemo(
+    () =>
+      persistedDrawTeams && persistedDrawTeams.length > 0
+        ? persistedDrawTeams
+        : generatedTeams,
+    [generatedTeams, persistedDrawTeams],
   );
   const whatsappMessage = useMemo(
     () => buildTeamDrawMessage(rachaTitle, teams, drawnAt ?? undefined),
@@ -503,8 +563,24 @@ export function TeamDrawModule({
           setScoreToWin(Math.max(5, Math.min(50, data.state.scoreToWin)));
         }
 
-        if (data.state.matchFlow) {
-          setMatchFlow(data.state.matchFlow as MatchFlowState);
+        if (data.state.matchFlow === null) {
+          setMatchFlow(null);
+        } else if (isMatchFlowState(data.state.matchFlow)) {
+          setMatchFlow(data.state.matchFlow);
+        } else if (
+          data.state.matchFlow &&
+          typeof data.state.matchFlow === "object"
+        ) {
+          const envelope = data.state
+            .matchFlow as Partial<PersistedMatchFlowEnvelope>;
+
+          if (envelope.flow === null || isMatchFlowState(envelope.flow)) {
+            setMatchFlow(envelope.flow ?? null);
+          }
+
+          if (isDrawTeamArray(envelope.drawnTeams)) {
+            setPersistedDrawTeams(envelope.drawnTeams);
+          }
         }
 
         if (Array.isArray(data.state.matchHistory)) {
@@ -554,7 +630,11 @@ export function TeamDrawModule({
         teamCount,
         drawnAt: drawnAt.toISOString(),
         scoreToWin,
-        matchFlow,
+        matchFlow: {
+          version: 1,
+          flow: matchFlow,
+          drawnTeams: teams,
+        },
         matchHistory: matchHistory.map((item) => ({
           ...item,
           createdAt: item.createdAt.toISOString(),
@@ -585,10 +665,30 @@ export function TeamDrawModule({
     scoreToWin,
     seed,
     teamCount,
+    teams,
   ]);
 
   const handleDraw = () => {
-    setSeed(Date.now());
+    if (drawnAt) {
+      const shouldStartNewDraw = window.confirm(
+        "Ja existe um sorteio realizado. Iniciar novo sorteio vai zerar confrontos e resultados. Deseja continuar?",
+      );
+
+      if (!shouldStartNewDraw) {
+        return;
+      }
+    }
+
+    const nextSeed = Date.now();
+    const nextTeams = drawBalancedTeams({
+      participants: enrollments,
+      teamCount,
+      modality,
+      seed: nextSeed,
+    });
+
+    setSeed(nextSeed);
+    setPersistedDrawTeams(nextTeams);
     setDrawnAt(new Date());
     setRevealedTeamCount(0);
     setExportFormat(null);
