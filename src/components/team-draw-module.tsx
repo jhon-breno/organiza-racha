@@ -612,12 +612,7 @@ export function TeamDrawModule({
   }, [maxTeamCount, rachaId]);
 
   useEffect(() => {
-    if (
-      isHydratingStateRef.current ||
-      !hasLoadedPersistedState ||
-      !drawnAt ||
-      isDrawing
-    ) {
+    if (isHydratingStateRef.current || !hasLoadedPersistedState || !drawnAt) {
       return;
     }
 
@@ -847,7 +842,12 @@ export function TeamDrawModule({
     concludeMatch(winnerSlot, computedScores);
   };
 
-  if (enrollments.length < 2 || linePlayers.length < 2) {
+  const hasPersistedOrDrawnTeams = drawnAt && teams.length >= 2;
+
+  if (
+    !hasPersistedOrDrawnTeams &&
+    (enrollments.length < 2 || linePlayers.length < 2)
+  ) {
     return (
       <Card>
         <h3 className="text-lg font-bold text-slate-950">Sorteio de times</h3>
