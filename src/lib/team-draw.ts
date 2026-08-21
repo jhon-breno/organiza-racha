@@ -220,6 +220,15 @@ export function drawBalancedTeams({
 
   if (shouldUseVoleiOrder) {
     // 2.2 Distribute women before men
+    const femaleCountFromSetters = teams.reduce(
+      (total, team) => total + team.setters.filter(isFemaleParticipant).length,
+      0,
+    );
+    const totalFemaleParticipants =
+      femalePlayers.length + femaleCountFromSetters;
+    const minFemalePerTeam = Math.floor(totalFemaleParticipants / teamCount);
+    const maxFemalePerTeam = Math.ceil(totalFemaleParticipants / teamCount);
+
     const shuffledFemalePlayers = shuffleSameScoreGroups(
       femalePlayers,
       seed + 509,
@@ -244,7 +253,21 @@ export function drawBalancedTeams({
         })
         .filter(({ currentSize, targetSize }) => currentSize < targetSize);
 
-      eligibleTeams.sort((left, right) => {
+      const teamsBelowMin = eligibleTeams.filter(
+        ({ femaleCount }) => femaleCount < minFemalePerTeam,
+      );
+      const teamsBelowMax = eligibleTeams.filter(
+        ({ femaleCount }) => femaleCount < maxFemalePerTeam,
+      );
+
+      const prioritizedTeams =
+        teamsBelowMin.length > 0
+          ? teamsBelowMin
+          : teamsBelowMax.length > 0
+            ? teamsBelowMax
+            : eligibleTeams;
+
+      prioritizedTeams.sort((left, right) => {
         if (left.femaleCount !== right.femaleCount) {
           return left.femaleCount - right.femaleCount;
         }
@@ -257,7 +280,7 @@ export function drawBalancedTeams({
         return random() - 0.5;
       });
 
-      const selectedTeam = eligibleTeams[0]?.team ?? teams[0];
+      const selectedTeam = prioritizedTeams[0]?.team ?? teams[0];
       selectedTeam.players.push(femalePlayer);
       selectedTeam.totalScore += score;
     });
