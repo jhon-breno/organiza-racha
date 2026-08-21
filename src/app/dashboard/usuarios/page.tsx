@@ -22,6 +22,18 @@ type SearchParams = Promise<{
   emailState?: string;
 }>;
 
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizePhoneDigits(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
 export default async function DashboardUsersPage({
   searchParams,
 }: {
@@ -51,36 +63,10 @@ export default async function DashboardUsersPage({
   const passwordStateFilter = params.passwordState ?? "all";
   const phoneStateFilter = params.phoneState ?? "all";
   const emailStateFilter = params.emailState ?? "all";
+  const normalizedQuery = normalizeSearchValue(query);
+  const queryDigits = normalizePhoneDigits(query);
 
   const where: Prisma.UserWhereInput = {};
-
-  if (query) {
-    where.OR = [
-      {
-        name: {
-          contains: query,
-          mode: "insensitive",
-        },
-      },
-      {
-        nickname: {
-          contains: query,
-          mode: "insensitive",
-        },
-      },
-      {
-        email: {
-          contains: query,
-          mode: "insensitive",
-        },
-      },
-      {
-        phone: {
-          contains: query.replace(/\D/g, ""),
-        },
-      },
-    ];
-  }
 
   if (genderFilter === "female") {
     where.isFemale = true;
@@ -106,7 +92,7 @@ export default async function DashboardUsersPage({
     where.email = null;
   }
 
-  const users = await prisma.user.findMany({
+  const rawUsers = await prisma.user.findMany({
     where,
     select: {
       id: true,
@@ -128,8 +114,24 @@ export default async function DashboardUsersPage({
       updatedAt: true,
     },
     orderBy: [{ updatedAt: "desc" }],
-    take: 300,
+    take: query ? 5000 : 300,
   });
+
+  const users = query
+    ? rawUsers.filter((user) => {
+        const textMatch = [user.name, user.nickname, user.email, user.phone]
+          .filter((value): value is string => Boolean(value))
+          .some((value) =>
+            normalizeSearchValue(value).includes(normalizedQuery),
+          );
+
+        const digitsMatch =
+          queryDigits.length >= 2 &&
+          normalizePhoneDigits(user.phone).includes(queryDigits);
+
+        return textMatch || digitsMatch;
+      })
+    : rawUsers;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
