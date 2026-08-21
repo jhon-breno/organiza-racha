@@ -166,22 +166,29 @@ export function drawBalancedTeams({
         )
       : participants;
 
-  // 2. Separate Setters (Levantadores)
-  const setters = nonGoalkeepers.filter((participant) =>
-    isSetterPosition(participant.participantPosition),
-  );
-  const nonSetters = nonGoalkeepers.filter(
-    (participant) => !isSetterPosition(participant.participantPosition),
-  );
+  // 2. Volleyball-specific classification order:
+  // Setters -> Women -> Men (balanced by star level)
+  const shouldUseVoleiOrder = modality === "VOLEI";
+  const setters = shouldUseVoleiOrder
+    ? nonGoalkeepers.filter((participant) =>
+        isSetterPosition(participant.participantPosition),
+      )
+    : [];
+  const nonSetters = shouldUseVoleiOrder
+    ? nonGoalkeepers.filter(
+        (participant) => !isSetterPosition(participant.participantPosition),
+      )
+    : nonGoalkeepers;
 
-  // 3. Separate Female Players (Mulheres) among remaining players
   const isFemaleParticipant = (participant: TeamDrawParticipant) =>
     participant.isFemale ?? detectIsFemaleByName(participant.participantName);
 
-  const femalePlayers = nonSetters.filter(isFemaleParticipant);
-  const maleOrOtherPlayers = nonSetters.filter(
-    (participant) => !isFemaleParticipant(participant),
-  );
+  const femalePlayers = shouldUseVoleiOrder
+    ? nonSetters.filter(isFemaleParticipant)
+    : [];
+  const maleOrOtherPlayers = shouldUseVoleiOrder
+    ? nonSetters.filter((participant) => !isFemaleParticipant(participant))
+    : nonSetters;
 
   const linePlayerCount = nonGoalkeepers.length;
   const targetSizes = buildTargetSizes(linePlayerCount, teamCount);
@@ -197,62 +204,66 @@ export function drawBalancedTeams({
 
   const random = createSeededRandom(seed + 97);
 
-  // Distribute Setters round-robin across teams
-  const shuffledSetters = shuffleSameScoreGroups(setters, seed + 311);
-  shuffledSetters.forEach((setter, index) => {
-    const targetTeam = teams[index % teams.length];
-    if (targetTeam) {
-      targetTeam.setters.push(setter);
-      targetTeam.totalScore += getParticipantLevelScore(
-        setter.participantLevel,
-      );
-    }
-  });
-
-  // Distribute Female Players evenly across teams to balance mixed teams
-  const shuffledFemalePlayers = shuffleSameScoreGroups(
-    femalePlayers,
-    seed + 509,
-  );
-  shuffledFemalePlayers.forEach((femalePlayer) => {
-    const score = getParticipantLevelScore(femalePlayer.participantLevel);
-
-    const eligibleTeams = teams
-      .map((team, index) => {
-        const currentSize = team.players.length + team.setters.length;
-        const femaleCount =
-          team.players.filter(isFemaleParticipant).length +
-          team.setters.filter(isFemaleParticipant).length;
-
-        return {
-          team,
-          index,
-          targetSize: targetSizes[index] ?? 0,
-          currentSize,
-          femaleCount,
-        };
-      })
-      .filter(({ currentSize, targetSize }) => currentSize < targetSize);
-
-    eligibleTeams.sort((left, right) => {
-      if (left.femaleCount !== right.femaleCount) {
-        return left.femaleCount - right.femaleCount;
+  if (shouldUseVoleiOrder) {
+    // 2.1 Distribute setters first, round-robin across teams
+    const shuffledSetters = shuffleSameScoreGroups(setters, seed + 311);
+    shuffledSetters.forEach((setter, index) => {
+      const targetTeam = teams[index % teams.length];
+      if (targetTeam) {
+        targetTeam.setters.push(setter);
+        targetTeam.totalScore += getParticipantLevelScore(
+          setter.participantLevel,
+        );
       }
-      if (left.team.totalScore !== right.team.totalScore) {
-        return left.team.totalScore - right.team.totalScore;
-      }
-      if (left.currentSize !== right.currentSize) {
-        return left.currentSize - right.currentSize;
-      }
-      return random() - 0.5;
     });
+  }
 
-    const selectedTeam = eligibleTeams[0]?.team ?? teams[0];
-    selectedTeam.players.push(femalePlayer);
-    selectedTeam.totalScore += score;
-  });
+  if (shouldUseVoleiOrder) {
+    // 2.2 Distribute women before men
+    const shuffledFemalePlayers = shuffleSameScoreGroups(
+      femalePlayers,
+      seed + 509,
+    );
+    shuffledFemalePlayers.forEach((femalePlayer) => {
+      const score = getParticipantLevelScore(femalePlayer.participantLevel);
 
-  // Distribute Remaining Line Players
+      const eligibleTeams = teams
+        .map((team, index) => {
+          const currentSize = team.players.length + team.setters.length;
+          const femaleCount =
+            team.players.filter(isFemaleParticipant).length +
+            team.setters.filter(isFemaleParticipant).length;
+
+          return {
+            team,
+            index,
+            targetSize: targetSizes[index] ?? 0,
+            currentSize,
+            femaleCount,
+          };
+        })
+        .filter(({ currentSize, targetSize }) => currentSize < targetSize);
+
+      eligibleTeams.sort((left, right) => {
+        if (left.femaleCount !== right.femaleCount) {
+          return left.femaleCount - right.femaleCount;
+        }
+        if (left.team.totalScore !== right.team.totalScore) {
+          return left.team.totalScore - right.team.totalScore;
+        }
+        if (left.currentSize !== right.currentSize) {
+          return left.currentSize - right.currentSize;
+        }
+        return random() - 0.5;
+      });
+
+      const selectedTeam = eligibleTeams[0]?.team ?? teams[0];
+      selectedTeam.players.push(femalePlayer);
+      selectedTeam.totalScore += score;
+    });
+  }
+
+  // 2.3 Distribute remaining players (in volei this is men/others), balanced by stars
   const shuffledRemaining = shuffleSameScoreGroups(
     maleOrOtherPlayers,
     seed + 97,
