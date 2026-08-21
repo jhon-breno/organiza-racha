@@ -1,16 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, MessageCircle, Shuffle, Sparkles, Trophy } from "lucide-react";
+import {
+  Copy,
+  MessageCircle,
+  Minus,
+  Plus,
+  RotateCcw,
+  Shuffle,
+  Sparkles,
+  Swords,
+  Trophy,
+} from "lucide-react";
 import { ToastContainer } from "@/components/toast-container";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   buildTeamDrawMessage,
   drawBalancedTeams,
   getSuggestedTeamCount,
+  type DrawTeam,
   type TeamDrawParticipant,
 } from "@/lib/team-draw";
 import { detectIsFemaleByName } from "@/lib/gender";
@@ -21,6 +33,7 @@ import {
 import { formatDateTimeShort, getDisplayName } from "@/lib/utils";
 
 type TeamDrawModuleProps = {
+  rachaId: string;
   rachaTitle: string;
   modality: string;
   futebolType?: string | null;
@@ -31,7 +44,175 @@ type TeamDrawModuleProps = {
 const INITIAL_DRAW_DELAY_MS = 5000;
 const TEAM_REVEAL_DELAY_MS = 850;
 
+type MatchScores = {
+  home: number;
+  away: number;
+};
+
+type MatchFlowState = {
+  round: number;
+  current: [string, string];
+  waiting: string[];
+  streakTeamId: string | null;
+  streakCount: number;
+  lastAction: "normal" | "double-win-rotation";
+};
+
+type MatchHistoryItem = {
+  id: string;
+  round: number;
+  homeTeamId: string;
+  awayTeamId: string;
+  winnerTeamId: string;
+  loserTeamId: string;
+  homeScore: number;
+  awayScore: number;
+  createdAt: Date;
+};
+
+type PersistedTeamDrawState = {
+  seed: number;
+  teamCount: number;
+  drawnAt: string;
+  scoreToWin: number;
+  matchFlow: MatchFlowState | null;
+  matchHistory: Array<
+    Omit<MatchHistoryItem, "createdAt"> & { createdAt: string }
+  >;
+};
+
+type TeamRankingItem = {
+  teamId: string;
+  teamName: string;
+  played: number;
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDiff: number;
+};
+
+function createInitialMatchFlow(teams: DrawTeam[]): MatchFlowState | null {
+  if (teams.length < 2) {
+    return null;
+  }
+
+  return {
+    round: 1,
+    current: [teams[0].id, teams[1].id],
+    waiting: teams.slice(2).map((team) => team.id),
+    streakTeamId: null,
+    streakCount: 0,
+    lastAction: "normal",
+  };
+}
+
+function isWinningScore(
+  candidateScore: number,
+  opponentScore: number,
+  scoreToWin: number,
+) {
+  return candidateScore >= scoreToWin && candidateScore - opponentScore >= 2;
+}
+
+function getWinningSlot(scores: MatchScores, scoreToWin: number) {
+  if (isWinningScore(scores.home, scores.away, scoreToWin)) {
+    return "home" as const;
+  }
+
+  if (isWinningScore(scores.away, scores.home, scoreToWin)) {
+    return "away" as const;
+  }
+
+  return null;
+}
+
+function advanceMatchFlow(
+  currentFlow: MatchFlowState,
+  winnerTeamId: string,
+): MatchFlowState {
+  const [homeTeamId, awayTeamId] = currentFlow.current;
+  const loserTeamId = winnerTeamId === homeTeamId ? awayTeamId : homeTeamId;
+  const nextStreakCount =
+    currentFlow.streakTeamId === winnerTeamId ? currentFlow.streakCount + 1 : 1;
+
+  if (currentFlow.waiting.length === 0) {
+    return {
+      round: currentFlow.round + 1,
+      current: [winnerTeamId, loserTeamId],
+      waiting: [],
+      streakTeamId: winnerTeamId,
+      streakCount: nextStreakCount,
+      lastAction: "normal",
+    };
+  }
+
+  if (nextStreakCount >= 2 && currentFlow.waiting.length >= 2) {
+    const [nextHomeTeamId, nextAwayTeamId, ...remainingWaiting] =
+      currentFlow.waiting;
+
+    return {
+      round: currentFlow.round + 1,
+      current: [nextHomeTeamId, nextAwayTeamId],
+      waiting: [...remainingWaiting, loserTeamId, winnerTeamId],
+      streakTeamId: null,
+      streakCount: 0,
+      lastAction: "double-win-rotation",
+    };
+  }
+
+  const [challengerTeamId, ...remainingWaiting] = currentFlow.waiting;
+
+  return {
+    round: currentFlow.round + 1,
+    current: [winnerTeamId, challengerTeamId],
+    waiting: [...remainingWaiting, loserTeamId],
+    streakTeamId: winnerTeamId,
+    streakCount: nextStreakCount,
+    lastAction: "normal",
+  };
+}
+
+function buildResultsWhatsappMessage(input: {
+  rachaTitle: string;
+  scoreToWin: number;
+  ranking: TeamRankingItem[];
+  matchHistory: MatchHistoryItem[];
+  resolveTeamName: (teamId: string) => string;
+}) {
+  let message = `*${input.rachaTitle}* - Resultados do racha\n`;
+  message += `Pontos para vencer: ${input.scoreToWin} (com 2 de diferenca)\n\n`;
+
+  message += "*Classificacao*\n";
+
+  if (input.ranking.length === 0) {
+    message += "Sem partidas finalizadas ainda.\n";
+  } else {
+    input.ranking.forEach((item, index) => {
+      message += `${index + 1}. ${item.teamName} - ${item.wins}V/${item.losses}D`;
+      message += ` | PJ:${item.played} | SD:${item.pointDiff >= 0 ? `+${item.pointDiff}` : item.pointDiff}\n`;
+    });
+  }
+
+  message += "\n*Ultimos confrontos*\n";
+
+  if (input.matchHistory.length === 0) {
+    message += "Nenhum confronto finalizado.\n";
+  } else {
+    input.matchHistory.slice(0, 12).forEach((match) => {
+      const homeTeamName = input.resolveTeamName(match.homeTeamId);
+      const awayTeamName = input.resolveTeamName(match.awayTeamId);
+      const winnerName = input.resolveTeamName(match.winnerTeamId);
+      message += `R${match.round}: ${homeTeamName} ${match.homeScore} x ${match.awayScore} ${awayTeamName}`;
+      message += ` (vencedor: ${winnerName})\n`;
+    });
+  }
+
+  return message;
+}
+
 export function TeamDrawModule({
+  rachaId,
   rachaTitle,
   modality,
   futebolType,
@@ -39,11 +220,23 @@ export function TeamDrawModule({
   enrollments,
 }: TeamDrawModuleProps) {
   const teamCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isHydratingStateRef = useRef(true);
+  const persistenceDebounceRef = useRef<number | null>(null);
   const [seed, setSeed] = useState(() => Date.now());
   const [drawnAt, setDrawnAt] = useState<Date | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [revealedTeamCount, setRevealedTeamCount] = useState(0);
-  const [exportFormat, setExportFormat] = useState<"whatsapp" | null>(null);
+  const [exportFormat, setExportFormat] = useState<
+    "draw-whatsapp" | "results-whatsapp" | null
+  >(null);
+  const [scoreToWin, setScoreToWin] = useState(15);
+  const [matchFlow, setMatchFlow] = useState<MatchFlowState | null>(null);
+  const [matchScores, setMatchScores] = useState<MatchScores>({
+    home: 0,
+    away: 0,
+  });
+  const [matchHistory, setMatchHistory] = useState<MatchHistoryItem[]>([]);
+  const [hasLoadedPersistedState, setHasLoadedPersistedState] = useState(false);
   const { addToast, removeToast, toasts } = useToast();
   const linePlayers = useMemo(
     () =>
@@ -93,6 +286,105 @@ export function TeamDrawModule({
     () => buildTeamDrawMessage(rachaTitle, teams, drawnAt ?? undefined),
     [drawnAt, rachaTitle, teams],
   );
+  const teamsById = useMemo(
+    () => new Map(teams.map((team) => [team.id, team])),
+    [teams],
+  );
+  const ranking = useMemo<TeamRankingItem[]>(() => {
+    const stats = new Map<string, TeamRankingItem>();
+
+    teams.forEach((team) => {
+      stats.set(team.id, {
+        teamId: team.id,
+        teamName: team.name,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        pointDiff: 0,
+      });
+    });
+
+    matchHistory.forEach((match) => {
+      const home = stats.get(match.homeTeamId);
+      const away = stats.get(match.awayTeamId);
+
+      if (!home || !away) {
+        return;
+      }
+
+      home.played += 1;
+      away.played += 1;
+      home.pointsFor += match.homeScore;
+      home.pointsAgainst += match.awayScore;
+      away.pointsFor += match.awayScore;
+      away.pointsAgainst += match.homeScore;
+
+      if (match.winnerTeamId === home.teamId) {
+        home.wins += 1;
+        away.losses += 1;
+      } else {
+        away.wins += 1;
+        home.losses += 1;
+      }
+    });
+
+    const normalized = [...stats.values()].map((item) => ({
+      ...item,
+      pointDiff: item.pointsFor - item.pointsAgainst,
+    }));
+
+    normalized.sort((left, right) => {
+      if (right.wins !== left.wins) {
+        return right.wins - left.wins;
+      }
+      if (right.pointDiff !== left.pointDiff) {
+        return right.pointDiff - left.pointDiff;
+      }
+      if (right.pointsFor !== left.pointsFor) {
+        return right.pointsFor - left.pointsFor;
+      }
+      if (left.losses !== right.losses) {
+        return left.losses - right.losses;
+      }
+      return left.teamName.localeCompare(right.teamName);
+    });
+
+    return normalized;
+  }, [matchHistory, teams]);
+  const resultsWhatsappMessage = useMemo(
+    () =>
+      buildResultsWhatsappMessage({
+        rachaTitle,
+        scoreToWin,
+        ranking,
+        matchHistory,
+        resolveTeamName: (teamId) => teamsById.get(teamId)?.name ?? teamId,
+      }),
+    [matchHistory, rachaTitle, ranking, scoreToWin, teamsById],
+  );
+  const currentMatch = useMemo(() => {
+    if (!matchFlow) {
+      return null;
+    }
+
+    const [homeTeamId, awayTeamId] = matchFlow.current;
+    const homeTeam = teamsById.get(homeTeamId);
+    const awayTeam = teamsById.get(awayTeamId);
+
+    if (!homeTeam || !awayTeam) {
+      return null;
+    }
+
+    return {
+      homeTeam,
+      awayTeam,
+      waitingTeams: matchFlow.waiting
+        .map((teamId) => teamsById.get(teamId))
+        .filter((team): team is DrawTeam => Boolean(team)),
+    };
+  }, [matchFlow, teamsById]);
 
   useEffect(() => {
     if (!isDrawing) {
@@ -138,12 +430,171 @@ export function TeamDrawModule({
     });
   }, [drawnAt, revealedTeamCount, teams]);
 
+  useEffect(() => {
+    if (!drawnAt || isDrawing || revealedTeamCount < teams.length) {
+      return;
+    }
+
+    if (matchFlow || matchHistory.length > 0) {
+      return;
+    }
+
+    setMatchFlow(createInitialMatchFlow(teams));
+    setMatchScores({ home: 0, away: 0 });
+    setMatchHistory([]);
+  }, [
+    drawnAt,
+    isDrawing,
+    matchFlow,
+    matchHistory.length,
+    revealedTeamCount,
+    teams,
+  ]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPersistedState = async () => {
+      try {
+        const response = await fetch(
+          `/api/dashboard/rachas/${rachaId}/team-draw-state`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as {
+          state:
+            | (Omit<PersistedTeamDrawState, "seed"> & {
+                seed: string | number;
+              })
+            | null;
+        };
+
+        if (!isMounted || !data.state) {
+          return;
+        }
+
+        const restoredSeed = Number(data.state.seed);
+
+        if (Number.isFinite(restoredSeed)) {
+          setSeed(restoredSeed);
+        }
+
+        if (typeof data.state.teamCount === "number") {
+          setTeamCount(
+            Math.max(2, Math.min(maxTeamCount, data.state.teamCount)),
+          );
+        }
+
+        if (data.state.drawnAt) {
+          setDrawnAt(new Date(data.state.drawnAt));
+          setIsDrawing(false);
+          setRevealedTeamCount(999);
+        }
+
+        if (typeof data.state.scoreToWin === "number") {
+          setScoreToWin(Math.max(5, Math.min(50, data.state.scoreToWin)));
+        }
+
+        if (data.state.matchFlow) {
+          setMatchFlow(data.state.matchFlow as MatchFlowState);
+        }
+
+        if (Array.isArray(data.state.matchHistory)) {
+          setMatchHistory(
+            data.state.matchHistory
+              .map((item) => ({
+                ...item,
+                createdAt: new Date(item.createdAt),
+              }))
+              .filter((item) => !Number.isNaN(item.createdAt.getTime())),
+          );
+        }
+      } catch {
+        // If persisted state fails to load, the user can keep using local in-memory flow.
+      } finally {
+        if (isMounted) {
+          isHydratingStateRef.current = false;
+          setHasLoadedPersistedState(true);
+        }
+      }
+    };
+
+    void loadPersistedState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [maxTeamCount, rachaId]);
+
+  useEffect(() => {
+    if (
+      isHydratingStateRef.current ||
+      !hasLoadedPersistedState ||
+      !drawnAt ||
+      isDrawing
+    ) {
+      return;
+    }
+
+    if (persistenceDebounceRef.current) {
+      window.clearTimeout(persistenceDebounceRef.current);
+    }
+
+    persistenceDebounceRef.current = window.setTimeout(() => {
+      const payload: PersistedTeamDrawState = {
+        seed,
+        teamCount,
+        drawnAt: drawnAt.toISOString(),
+        scoreToWin,
+        matchFlow,
+        matchHistory: matchHistory.map((item) => ({
+          ...item,
+          createdAt: item.createdAt.toISOString(),
+        })),
+      };
+
+      void fetch(`/api/dashboard/rachas/${rachaId}/team-draw-state`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    }, 350);
+
+    return () => {
+      if (persistenceDebounceRef.current) {
+        window.clearTimeout(persistenceDebounceRef.current);
+      }
+    };
+  }, [
+    drawnAt,
+    hasLoadedPersistedState,
+    isDrawing,
+    matchFlow,
+    matchHistory,
+    rachaId,
+    scoreToWin,
+    seed,
+    teamCount,
+  ]);
+
   const handleDraw = () => {
     setSeed(Date.now());
     setDrawnAt(new Date());
     setRevealedTeamCount(0);
     setExportFormat(null);
     setIsDrawing(true);
+    setMatchFlow(null);
+    setMatchScores({ home: 0, away: 0 });
+    setMatchHistory([]);
   };
 
   const currentRevealTeam =
@@ -151,14 +602,14 @@ export function TeamDrawModule({
       ? teams[Math.min(revealedTeamCount, teams.length - 1)]
       : null;
 
-  const handleCopy = async () => {
+  const handleCopy = async (message = whatsappMessage) => {
     if (!drawnAt) {
       addToast("Realize o sorteio antes de exportar.", "error");
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(whatsappMessage);
+      await navigator.clipboard.writeText(message);
       addToast("Sorteio copiado para a area de transferencia.", "success");
     } catch {
       addToast("Nao foi possivel copiar o sorteio.", "error");
@@ -171,15 +622,127 @@ export function TeamDrawModule({
       return;
     }
 
-    setExportFormat("whatsapp");
+    setExportFormat("draw-whatsapp");
   };
+
+  const handleResultsWhatsappExport = () => {
+    if (!drawnAt) {
+      addToast("Realize o sorteio antes de exportar.", "error");
+      return;
+    }
+
+    if (matchHistory.length === 0) {
+      addToast(
+        "Finalize pelo menos um confronto para exportar resultados.",
+        "error",
+      );
+      return;
+    }
+
+    setExportFormat("results-whatsapp");
+  };
+
+  const activeWhatsappMessage =
+    exportFormat === "results-whatsapp"
+      ? resultsWhatsappMessage
+      : whatsappMessage;
 
   const handleOpenWhatsapp = () => {
     window.open(
-      `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`,
+      `https://wa.me/?text=${encodeURIComponent(activeWhatsappMessage)}`,
       "_blank",
       "noopener,noreferrer",
     );
+  };
+
+  const handleResetCurrentMatch = () => {
+    setMatchScores({ home: 0, away: 0 });
+  };
+
+  const concludeMatch = (
+    winnerSlot: "home" | "away",
+    finalScores?: MatchScores,
+  ) => {
+    if (!matchFlow || !currentMatch) {
+      return;
+    }
+
+    const scores = finalScores ?? matchScores;
+    const winnerTeamId =
+      winnerSlot === "home"
+        ? currentMatch.homeTeam.id
+        : currentMatch.awayTeam.id;
+    const loserTeamId =
+      winnerSlot === "home"
+        ? currentMatch.awayTeam.id
+        : currentMatch.homeTeam.id;
+    const winnerName =
+      winnerSlot === "home"
+        ? currentMatch.homeTeam.name
+        : currentMatch.awayTeam.name;
+    const nextFlow = advanceMatchFlow(matchFlow, winnerTeamId);
+
+    setMatchHistory((previous) => [
+      {
+        id: `${Date.now()}-${previous.length + 1}`,
+        round: matchFlow.round,
+        homeTeamId: currentMatch.homeTeam.id,
+        awayTeamId: currentMatch.awayTeam.id,
+        winnerTeamId,
+        loserTeamId,
+        homeScore: scores.home,
+        awayScore: scores.away,
+        createdAt: new Date(),
+      },
+      ...previous,
+    ]);
+    setMatchFlow(nextFlow);
+    setMatchScores({ home: 0, away: 0 });
+
+    addToast(
+      `${winnerName} venceu por ${scores.home} x ${scores.away}.`,
+      "success",
+    );
+
+    if (nextFlow.lastAction === "double-win-rotation") {
+      addToast(
+        `${winnerName} venceu 2 seguidas e saiu. Entram os dois times da fila.`,
+        "success",
+      );
+    }
+  };
+
+  const handlePointChange = (slot: "home" | "away", delta: 1 | -1) => {
+    if (!matchFlow || !currentMatch) {
+      return;
+    }
+
+    let computedScores: MatchScores | null = null;
+
+    setMatchScores((previous) => {
+      const currentValue = slot === "home" ? previous.home : previous.away;
+      const nextValue = Math.max(0, currentValue + delta);
+      const nextScores =
+        slot === "home"
+          ? { ...previous, home: nextValue }
+          : { ...previous, away: nextValue };
+
+      computedScores = nextScores;
+
+      return nextScores;
+    });
+
+    if (!computedScores || delta < 0) {
+      return;
+    }
+
+    const winnerSlot = getWinningSlot(computedScores, scoreToWin);
+
+    if (!winnerSlot) {
+      return;
+    }
+
+    concludeMatch(winnerSlot, computedScores);
   };
 
   if (enrollments.length < 2 || linePlayers.length < 2) {
@@ -300,7 +863,7 @@ export function TeamDrawModule({
               Exportar para WhatsApp
             </Button>
 
-            <Button onClick={handleCopy} type="button" variant="ghost">
+            <Button onClick={() => handleCopy()} type="button" variant="ghost">
               <Copy className="h-4 w-4" />
               Copiar texto
             </Button>
@@ -357,14 +920,18 @@ export function TeamDrawModule({
           </div>
         ) : null}
 
-        {exportFormat === "whatsapp" ? (
+        {exportFormat ? (
           <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-4">
             <div className="max-h-[38vh] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-900 whitespace-pre-wrap sm:max-h-[50vh]">
-              {whatsappMessage}
+              {activeWhatsappMessage}
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleCopy} className="flex-1" type="button">
+              <Button
+                onClick={() => handleCopy(activeWhatsappMessage)}
+                className="flex-1"
+                type="button"
+              >
                 <Copy className="h-4 w-4" />
                 Copiar mensagem
               </Button>
@@ -543,6 +1110,265 @@ export function TeamDrawModule({
                 </div>
               );
             })}
+          </div>
+        ) : null}
+
+        {drawnAt && !isDrawing && matchFlow && currentMatch ? (
+          <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
+                  Confrontos do racha
+                </p>
+                <h4 className="mt-1 text-xl font-black text-slate-950">
+                  Rodada {matchFlow.round}: {currentMatch.homeTeam.name} x{" "}
+                  {currentMatch.awayTeam.name}
+                </h4>
+                <p className="mt-1 text-sm text-slate-600">
+                  Time que chega em {scoreToWin} com diferenca minima de 2
+                  pontos vence.
+                </p>
+              </div>
+
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                Pontos para vencer
+                <Input
+                  className="h-11 w-32"
+                  min={5}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (Number.isNaN(value)) {
+                      return;
+                    }
+                    setScoreToWin(Math.max(5, Math.min(50, value)));
+                  }}
+                  step={1}
+                  type="number"
+                  value={scoreToWin}
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr]">
+              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4 text-center">
+                <p className="text-sm font-semibold text-slate-700">
+                  {currentMatch.homeTeam.name}
+                </p>
+                <p className="mt-2 text-5xl font-black tabular-nums text-teal-800">
+                  {matchScores.home}
+                </p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button
+                    className="h-11 min-w-20"
+                    onClick={() => handlePointChange("home", -1)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <Minus className="h-4 w-4" />
+                    -1
+                  </Button>
+                  <Button
+                    className="h-11 min-w-20"
+                    onClick={() => handlePointChange("home", 1)}
+                    type="button"
+                  >
+                    <Plus className="h-4 w-4" />
+                    +1
+                  </Button>
+                </div>
+              </div>
+
+              <div className="hidden items-center justify-center lg:flex">
+                <div className="rounded-full bg-slate-100 p-3 text-slate-500">
+                  <Swords className="h-5 w-5" />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-center">
+                <p className="text-sm font-semibold text-slate-700">
+                  {currentMatch.awayTeam.name}
+                </p>
+                <p className="mt-2 text-5xl font-black tabular-nums text-sky-800">
+                  {matchScores.away}
+                </p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button
+                    className="h-11 min-w-20"
+                    onClick={() => handlePointChange("away", -1)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <Minus className="h-4 w-4" />
+                    -1
+                  </Button>
+                  <Button
+                    className="h-11 min-w-20"
+                    onClick={() => handlePointChange("away", 1)}
+                    type="button"
+                  >
+                    <Plus className="h-4 w-4" />
+                    +1
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleResultsWhatsappExport}
+                type="button"
+                variant="outline"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Exportar resultados WhatsApp
+              </Button>
+              <Button
+                disabled={
+                  !isWinningScore(
+                    matchScores.home,
+                    matchScores.away,
+                    scoreToWin,
+                  )
+                }
+                onClick={() => concludeMatch("home")}
+                type="button"
+                variant="outline"
+              >
+                Confirmar vitoria {currentMatch.homeTeam.name}
+              </Button>
+              <Button
+                disabled={
+                  !isWinningScore(
+                    matchScores.away,
+                    matchScores.home,
+                    scoreToWin,
+                  )
+                }
+                onClick={() => concludeMatch("away")}
+                type="button"
+                variant="outline"
+              >
+                Confirmar vitoria {currentMatch.awayTeam.name}
+              </Button>
+              <Button
+                onClick={handleResetCurrentMatch}
+                type="button"
+                variant="ghost"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Zerar placar atual
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Fila de espera
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {currentMatch.waitingTeams.length > 0 ? (
+                  currentMatch.waitingTeams.map((team) => (
+                    <span
+                      key={team.id}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                    >
+                      {team.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-500">
+                    Sem fila no momento.
+                  </span>
+                )}
+              </div>
+              {matchFlow.streakTeamId ? (
+                <p className="mt-3 text-xs text-slate-600">
+                  Sequencia atual:{" "}
+                  {teamsById.get(matchFlow.streakTeamId)?.name ?? "Time"} com{" "}
+                  {matchFlow.streakCount} vitoria(s).
+                </p>
+              ) : null}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Classificacao dos times
+              </p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-xs text-slate-600">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="px-2 py-2 font-semibold">#</th>
+                      <th className="px-2 py-2 font-semibold">Time</th>
+                      <th className="px-2 py-2 font-semibold">V</th>
+                      <th className="px-2 py-2 font-semibold">D</th>
+                      <th className="px-2 py-2 font-semibold">PJ</th>
+                      <th className="px-2 py-2 font-semibold">PF</th>
+                      <th className="px-2 py-2 font-semibold">PC</th>
+                      <th className="px-2 py-2 font-semibold">SD</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ranking.map((item, index) => (
+                      <tr
+                        key={item.teamId}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="px-2 py-2 font-semibold text-slate-900">
+                          {index + 1}
+                        </td>
+                        <td className="px-2 py-2 font-semibold text-slate-900">
+                          {item.teamName}
+                        </td>
+                        <td className="px-2 py-2">{item.wins}</td>
+                        <td className="px-2 py-2">{item.losses}</td>
+                        <td className="px-2 py-2">{item.played}</td>
+                        <td className="px-2 py-2">{item.pointsFor}</td>
+                        <td className="px-2 py-2">{item.pointsAgainst}</td>
+                        <td className="px-2 py-2 font-semibold text-slate-800">
+                          {item.pointDiff >= 0
+                            ? `+${item.pointDiff}`
+                            : item.pointDiff}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Ultimos resultados
+              </p>
+              {matchHistory.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  Nenhum confronto finalizado ainda.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {matchHistory.slice(0, 8).map((item) => {
+                    const homeTeam = teamsById.get(item.homeTeamId);
+                    const awayTeam = teamsById.get(item.awayTeamId);
+                    const winnerTeam = teamsById.get(item.winnerTeamId);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                      >
+                        <p className="font-semibold text-slate-900">
+                          Rodada {item.round}: {homeTeam?.name} {item.homeScore}{" "}
+                          x {item.awayScore} {awayTeam?.name}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Vencedor: {winnerTeam?.name}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
       </Card>

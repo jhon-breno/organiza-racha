@@ -130,10 +130,25 @@ model Racha {
   organizer               User           @relation(fields: [organizerId], references: [id], onDelete: Cascade)
   enrollments             Enrollment[]
   rachaAdmins             RachaAdmin[]
+  teamDrawSession         TeamDrawSession?
 
   @@index([eventDate])
   @@index([city])
   @@index([organizerId])
+}
+
+model TeamDrawSession {
+  id          String   @id @default(cuid())
+  rachaId     String   @unique
+  seed        BigInt
+  teamCount   Int
+  drawnAt     DateTime
+  scoreToWin  Int      @default(15)
+  matchFlow   Json?
+  matchHistory Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  racha       Racha    @relation(fields: [rachaId], references: [id], onDelete: Cascade)
 }
 
 model RachaAdmin {

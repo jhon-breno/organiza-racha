@@ -96,6 +96,7 @@ export default async function RachaTeamDrawPage({
         enrollments={confirmedEnrollments}
         futebolType={racha.futebolType}
         modality={racha.modality}
+        rachaId={racha.id}
         rachaTitle={racha.title}
         voleiType={racha.voleiType}
       />

@@ -55,6 +55,44 @@ function getStringValue(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeAuthCallbackUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "/";
+  }
+
+  if (trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const trustedHosts = [
+      process.env.AUTH_URL,
+      process.env.NEXTAUTH_URL,
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    ]
+      .filter(Boolean)
+      .map((url) => {
+        try {
+          return new URL(url as string).host;
+        } catch {
+          return null;
+        }
+      })
+      .filter((host): host is string => Boolean(host));
+
+    if (trustedHosts.includes(parsed.host)) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}` || "/";
+    }
+  } catch {
+    // Invalid callback URL should fallback to root.
+  }
+
+  return "/";
+}
+
 function getFirstIssueFieldName(issues: { path: PropertyKey[] }[]) {
   const firstPathEntry = issues[0]?.path?.[0];
   return typeof firstPathEntry === "string" ? firstPathEntry : undefined;
@@ -677,7 +715,9 @@ async function generateUniqueSlug(title: string, currentId?: string) {
 }
 
 export async function signInWithGoogleAction(formData: FormData) {
-  const callbackUrl = getStringValue(formData, "callbackUrl") || "/";
+  const callbackUrl = normalizeAuthCallbackUrl(
+    getStringValue(formData, "callbackUrl") || "/",
+  );
 
   if (!isGoogleConfigured) {
     redirect(
@@ -693,7 +733,9 @@ export async function signInWithGoogleAction(formData: FormData) {
 }
 
 export async function signInWithCredentialsAction(formData: FormData) {
-  const callbackUrl = getStringValue(formData, "callbackUrl") || "/";
+  const callbackUrl = normalizeAuthCallbackUrl(
+    getStringValue(formData, "callbackUrl") || "/",
+  );
   const parsed = credentialsSignInSchema.safeParse({
     identifier: getStringValue(formData, "identifier"),
     password: getStringValue(formData, "password"),
@@ -761,7 +803,9 @@ export async function signInWithCredentialsAction(formData: FormData) {
 }
 
 export async function signUpWithPasswordAction(formData: FormData) {
-  const callbackUrl = getStringValue(formData, "callbackUrl") || "/";
+  const callbackUrl = normalizeAuthCallbackUrl(
+    getStringValue(formData, "callbackUrl") || "/",
+  );
   const parsed = signUpSchema.safeParse({
     name: getStringValue(formData, "name"),
     email: getStringValue(formData, "email"),
