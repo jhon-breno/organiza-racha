@@ -1,4 +1,5 @@
 import { buildPixPaymentPayload } from "@/lib/pix";
+import { prisma } from "@/lib/prisma";
 import { formatCurrencyFromCents, getTimeZoneParts } from "@/lib/utils";
 
 export type BaseRachaMessageDetails = {
@@ -66,7 +67,10 @@ export function getAppBaseUrl(): string {
 /**
  * Monta o link para o racha
  */
-export function getRachaFullUrl(slug?: string | null, customUrl?: string | null): string {
+export function getRachaFullUrl(
+  slug?: string | null,
+  customUrl?: string | null,
+): string {
   if (customUrl) return customUrl;
   if (!slug) return "";
   const baseUrl = getAppBaseUrl();
@@ -81,7 +85,10 @@ export function normalizePhoneForWhatsapp(phone: string): string {
   const digits = phone.replace(/\D/g, "");
 
   // Se já tiver 12 ou 13 dígitos e começar com 55 (Brasil)
-  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+  if (
+    (digits.length === 12 || digits.length === 13) &&
+    digits.startsWith("55")
+  ) {
     return digits;
   }
 
@@ -105,7 +112,10 @@ export function buildWhatsappLink(phone?: string | null): string {
 /**
  * Formata data e hora para exibição
  */
-function formatEventDateTime(eventDate: Date, eventEndDate?: Date | null): { dateStr: string; timeStr: string } {
+function formatEventDateTime(
+  eventDate: Date,
+  eventEndDate?: Date | null,
+): { dateStr: string; timeStr: string } {
   const parts = getTimeZoneParts(eventDate);
   const dateStr = `${parts.day}/${parts.month}/${parts.year}`;
 
@@ -124,17 +134,23 @@ function formatEventDateTime(eventDate: Date, eventEndDate?: Date | null): { dat
  * Olá, *{Nome}*!
  * Recebemos sua solicitação para o racha *{Título}*.
  * Para que sua inscrição seja concluída é necessário que realize o pagamento ao organizador.
- * 
+ *
  * Segue os dados do pagemento:
  * Valor: *R$ 10,00*
  * Nome: {Nome configurado pelo usuario organizador do racha no pix}
- * 
+ *
  * WhatsApp Org para envio do comprovante: https://wa.me/...
  * ...
  */
-export function buildPaidEnrollmentRequestMessage(options: PaidEnrollmentMessageDetails): string {
-  const { dateStr, timeStr } = formatEventDateTime(options.eventDate, options.eventEndDate);
-  const nameToDisplay = options.participantNickname?.trim() || options.participantName?.trim();
+export function buildPaidEnrollmentRequestMessage(
+  options: PaidEnrollmentMessageDetails,
+): string {
+  const { dateStr, timeStr } = formatEventDateTime(
+    options.eventDate,
+    options.eventEndDate,
+  );
+  const nameToDisplay =
+    options.participantNickname?.trim() || options.participantName?.trim();
   const rachaLink = getRachaFullUrl(options.rachaSlug, options.rachaUrl);
   const organizerWaLink = options.organizerPhoneWhatsapp
     ? buildWhatsappLink(options.organizerPhoneWhatsapp)
@@ -167,7 +183,7 @@ export function buildPaidEnrollmentRequestMessage(options: PaidEnrollmentMessage
     "",
     "Detalhes do racha:",
     `📅 Data: ${dateStr}`,
-    `⏰ Horário: ${timeStr}`
+    `⏰ Horário: ${timeStr}`,
   );
 
   if (options.locationName) {
@@ -186,7 +202,7 @@ export function buildPaidEnrollmentRequestMessage(options: PaidEnrollmentMessage
     "Esperamos por você. Caso precise desistir da sua vaga, acesse o link acima para cancelar ou entre em contato com o organizador com antecedência para liberar a vaga para a lista de espera.",
     "",
     "Abraço.",
-    "Equipe Organiza Racha."
+    "Equipe Organiza Racha.",
   );
 
   return lines.join("\n");
@@ -195,9 +211,15 @@ export function buildPaidEnrollmentRequestMessage(options: PaidEnrollmentMessage
 /**
  * 2. Mensagem de Confirmação para Racha Gratuito
  */
-export function buildFreeEnrollmentConfirmationMessage(options: BaseRachaMessageDetails): string {
-  const { dateStr, timeStr } = formatEventDateTime(options.eventDate, options.eventEndDate);
-  const nameToDisplay = options.participantNickname?.trim() || options.participantName?.trim();
+export function buildFreeEnrollmentConfirmationMessage(
+  options: BaseRachaMessageDetails,
+): string {
+  const { dateStr, timeStr } = formatEventDateTime(
+    options.eventDate,
+    options.eventEndDate,
+  );
+  const nameToDisplay =
+    options.participantNickname?.trim() || options.participantName?.trim();
   const rachaLink = getRachaFullUrl(options.rachaSlug, options.rachaUrl);
 
   const lines = [
@@ -224,7 +246,7 @@ export function buildFreeEnrollmentConfirmationMessage(options: BaseRachaMessage
     "Esperamos por você. Caso precise desistir da sua vaga, acesse o link acima para cancelar ou entre em contato com o organizador com antecedência para liberar a vaga para a lista de espera.",
     "",
     "Abraço.",
-    "Equipe Organiza Racha."
+    "Equipe Organiza Racha.",
   );
 
   return lines.join("\n");
@@ -233,9 +255,15 @@ export function buildFreeEnrollmentConfirmationMessage(options: BaseRachaMessage
 /**
  * 3. Mensagem quando o Organizador Confirma o Pagamento (Entrada na lista com posição)
  */
-export function buildPaymentConfirmedMessage(options: PaymentConfirmedMessageDetails): string {
-  const { dateStr, timeStr } = formatEventDateTime(options.eventDate, options.eventEndDate);
-  const nameToDisplay = options.participantNickname?.trim() || options.participantName?.trim();
+export function buildPaymentConfirmedMessage(
+  options: PaymentConfirmedMessageDetails,
+): string {
+  const { dateStr, timeStr } = formatEventDateTime(
+    options.eventDate,
+    options.eventEndDate,
+  );
+  const nameToDisplay =
+    options.participantNickname?.trim() || options.participantName?.trim();
   const rachaLink = getRachaFullUrl(options.rachaSlug, options.rachaUrl);
 
   const lines = [
@@ -265,7 +293,7 @@ export function buildPaymentConfirmedMessage(options: PaymentConfirmedMessageDet
     "Bom jogo! Caso precise desistir, acesse o link acima com antecedência para liberar a vaga para a lista de espera.",
     "",
     "Abraço.",
-    "Equipe Organiza Racha."
+    "Equipe Organiza Racha.",
   );
 
   return lines.join("\n");
@@ -274,10 +302,15 @@ export function buildPaymentConfirmedMessage(options: PaymentConfirmedMessageDet
 /**
  * 4. Mensagem para o Atleta quando a Inscrição é Cancelada
  */
-export function buildAthleteCancellationMessage(options: AthleteCancellationMessageDetails): string {
-  const nameToDisplay = options.participantNickname?.trim() || options.participantName?.trim();
+export function buildAthleteCancellationMessage(
+  options: AthleteCancellationMessageDetails,
+): string {
+  const nameToDisplay =
+    options.participantNickname?.trim() || options.participantName?.trim();
   const rachaLink = getRachaFullUrl(options.rachaSlug, options.rachaUrl);
-  const priceFormatted = options.priceInCents ? formatCurrencyFromCents(options.priceInCents) : "";
+  const priceFormatted = options.priceInCents
+    ? formatCurrencyFromCents(options.priceInCents)
+    : "";
 
   const lines = [
     nameToDisplay ? `Olá, *${nameToDisplay}*!` : "Olá!",
@@ -288,12 +321,12 @@ export function buildAthleteCancellationMessage(options: AthleteCancellationMess
     lines.push(
       "",
       `💰 Como sua inscrição era paga${priceFormatted ? ` (${priceFormatted})` : ""}, a solicitação de reembolso foi enviada ao organizador.`,
-      "Por favor, aguarde o contato ou o processamento da devolução pelo organizador."
+      "Por favor, aguarde o contato ou o processamento da devolução pelo organizador.",
     );
   } else {
     lines.push(
       "",
-      "Sua vaga foi liberada com sucesso. Esperamos ver você em um próximo racha!"
+      "Sua vaga foi liberada com sucesso. Esperamos ver você em um próximo racha!",
     );
   }
 
@@ -301,11 +334,7 @@ export function buildAthleteCancellationMessage(options: AthleteCancellationMess
     lines.push("", `🔗 Link do racha: ${rachaLink}`);
   }
 
-  lines.push(
-    "",
-    "Abraço.",
-    "Equipe Organiza Racha."
-  );
+  lines.push("", "Abraço.", "Equipe Organiza Racha.");
 
   return lines.join("\n");
 }
@@ -313,7 +342,9 @@ export function buildAthleteCancellationMessage(options: AthleteCancellationMess
 /**
  * 5. Mensagem para o Organizador quando o Atleta Cancela uma Inscrição Paga (Alerta de Reembolso)
  */
-export function buildOrganizerRefundAlertMessage(options: OrganizerRefundAlertDetails): string {
+export function buildOrganizerRefundAlertMessage(
+  options: OrganizerRefundAlertDetails,
+): string {
   const parts = getTimeZoneParts(options.eventDate);
   const dateStr = `${parts.day}/${parts.month}/${parts.year}`;
   const athleteDisplay = options.athleteNickname?.trim()
@@ -348,7 +379,7 @@ export function buildOrganizerRefundAlertMessage(options: OrganizerRefundAlertDe
     "",
     "Por favor, realize a devolução e confirme o estorno no painel do racha.",
     "",
-    "Organiza Racha Bot."
+    "Organiza Racha Bot.",
   );
 
   return lines.join("\n");
@@ -357,9 +388,15 @@ export function buildOrganizerRefundAlertMessage(options: OrganizerRefundAlertDe
 /**
  * 6. Mensagem de Lembrete Padrão / Notificação Pré-jogo
  */
-export function buildRachaReminderMessage(options: BaseRachaMessageDetails): string {
-  const { dateStr, timeStr } = formatEventDateTime(options.eventDate, options.eventEndDate);
-  const nameToDisplay = options.participantNickname?.trim() || options.participantName?.trim();
+export function buildRachaReminderMessage(
+  options: BaseRachaMessageDetails,
+): string {
+  const { dateStr, timeStr } = formatEventDateTime(
+    options.eventDate,
+    options.eventEndDate,
+  );
+  const nameToDisplay =
+    options.participantNickname?.trim() || options.participantName?.trim();
   const rachaLink = getRachaFullUrl(options.rachaSlug, options.rachaUrl);
 
   const lines = [
@@ -384,7 +421,7 @@ export function buildRachaReminderMessage(options: BaseRachaMessageDetails): str
     "Esperamos por você. Caso precise desistir da sua vaga, acesse o link acima para cancelar ou entre em contato com o organizador com antecedência para liberar a vaga para a lista de espera.",
     "",
     "Abraço.",
-    "Equipe Organiza Racha."
+    "Equipe Organiza Racha.",
   );
 
   return lines.join("\n");
@@ -403,7 +440,7 @@ export async function sendBotbotWhatsappMessage(params: {
 
   if (!authKey || !appKey) {
     console.warn(
-      "[BotBot WhatsApp] Chaves de API não configuradas (BOTBOT_AUTH_KEY e BOTBOT_APP_KEY)."
+      "[BotBot WhatsApp] Chaves de API não configuradas (BOTBOT_AUTH_KEY e BOTBOT_APP_KEY).",
     );
     return {
       success: false,
@@ -439,7 +476,7 @@ export async function sendBotbotWhatsappMessage(params: {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       console.error(
-        `[BotBot WhatsApp Error] HTTP ${response.status}: ${errorText || response.statusText}`
+        `[BotBot WhatsApp Error] HTTP ${response.status}: ${errorText || response.statusText}`,
       );
       return {
         success: false,
@@ -468,7 +505,7 @@ export async function sendBotbotWhatsappMessages(
     to: string;
     message: string;
   }>,
-  delayMs: number = 500
+  delayMs: number = 500,
 ): Promise<{ total: number; sent: number; failed: number }> {
   let sent = 0;
   let failed = 0;
@@ -488,6 +525,75 @@ export async function sendBotbotWhatsappMessages(
   }
 
   return { total: recipients.length, sent, failed };
+}
+
+/**
+ * Processa os lembretes automáticos que já entraram na janela configurada.
+ */
+export async function processScheduledRachaReminders(): Promise<{
+  rachas: number;
+  total: number;
+  sent: number;
+  failed: number;
+}> {
+  const now = new Date();
+  const scheduledRachas = await prisma.racha.findMany({
+    where: {
+      autoNotifyReminder: true,
+      reminderSentAt: null,
+      status: "PUBLISHED",
+      eventDate: { gt: now },
+    },
+    include: {
+      enrollments: {
+        where: { status: { not: "CANCELED" } },
+        include: { user: { select: { nickname: true } } },
+      },
+    },
+  });
+
+  let total = 0;
+  let sent = 0;
+  let failed = 0;
+  let processedRachas = 0;
+
+  for (const racha of scheduledRachas) {
+    const hoursBefore = racha.autoNotifyHoursBefore ?? 1;
+    const reminderAt = new Date(
+      racha.eventDate.getTime() - hoursBefore * 60 * 60 * 1000,
+    );
+
+    if (now < reminderAt) continue;
+
+    const recipients = racha.enrollments.map((enrollment) => ({
+      to: enrollment.participantPhone,
+      message: buildRachaReminderMessage({
+        participantName: enrollment.participantName,
+        participantNickname: enrollment.user.nickname,
+        rachaTitle: racha.title,
+        rachaSlug: racha.slug,
+        eventDate: racha.eventDate,
+        eventEndDate: racha.eventEndDate,
+        locationName: racha.locationName,
+        address: racha.address,
+      }),
+    }));
+
+    const results = await sendBotbotWhatsappMessages(recipients);
+    total += results.total;
+    sent += results.sent;
+    failed += results.failed;
+    processedRachas++;
+
+    if (results.failed === 0) {
+      await prisma.racha.update({
+        where: { id: racha.id },
+        data: { reminderSentAt: new Date() },
+      });
+    }
+  }
+
+  return { rachas: processedRachas, total, sent, failed };
 }
 
 /**
@@ -523,9 +629,7 @@ export async function sendPaidEnrollmentWhatsappNotification(params: {
         params.details.organizerDisplayName ||
         "ORGANIZADOR",
       merchantCity:
-        params.details.rachaCity ||
-        params.details.locationName ||
-        "FORTALEZA",
+        params.details.rachaCity || params.details.locationName || "FORTALEZA",
       description: params.details.rachaTitle,
     });
 
@@ -541,4 +645,3 @@ export async function sendPaidEnrollmentWhatsappNotification(params: {
 
   return { success: true };
 }
-
