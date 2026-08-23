@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import QRCode from "qrcode";
-import { Check, Copy, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import {
   cancelEnrollmentAction,
   cancelPendingEnrollmentAction,
 } from "@/actions";
+import { PixPaymentCard } from "@/components/pix-payment-card";
 import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { isGoalkeeperPosition } from "@/lib/enrollment";
-import { buildPixPaymentPayload } from "@/lib/pix";
-import { formatCurrencyFromCents } from "@/lib/utils";
+
 
 type MyEnrollmentActionsProps = {
   enrollmentId: string;
@@ -44,10 +43,6 @@ export function MyEnrollmentActions({
   const [isCancelPendingModalOpen, setIsCancelPendingModalOpen] =
     useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
-  const [paymentQrCodeUrl, setPaymentQrCodeUrl] = useState("");
-  const [paymentCopyFeedback, setPaymentCopyFeedback] = useState<
-    "key" | "payload" | null
-  >(null);
   const [cancelPendingConfirmError, setCancelPendingConfirmError] = useState<
     string | null
   >(null);
@@ -63,21 +58,10 @@ export function MyEnrollmentActions({
     enrollmentStatus !== "CANCELED" && (isFree || isGoalkeeper || paymentStatus === "PENDING");
   const canRequestRefund =
     !isFree && !isGoalkeeper && paymentStatus === "PAID" && enrollmentStatus !== "CANCELED";
-  const pixPayload = useMemo(
-    () =>
-      buildPixPaymentPayload({
-        pixKey,
-        amountInCents: priceInCents,
-        merchantName: organizerDisplayName,
-        merchantCity: rachaCity,
-        description: rachaTitle,
-      }),
-    [organizerDisplayName, pixKey, priceInCents, rachaCity, rachaTitle],
-  );
 
   const modalTitle = useMemo(() => {
     if (isPaymentModalOpen) {
-      return "Realizar pagamento";
+      return "Realizar Pagamento via PIX";
     }
 
     if (isCancelPendingModalOpen) {
@@ -91,45 +75,6 @@ export function MyEnrollmentActions({
     return "";
   }, [isCancelPendingModalOpen, isPaymentModalOpen, isRefundModalOpen]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!isPaymentModalOpen || !pixPayload) {
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    QRCode.toDataURL(pixPayload, {
-      errorCorrectionLevel: "M",
-      margin: 2,
-      width: 280,
-    })
-      .then((dataUrl) => {
-        if (isMounted) {
-          setPaymentQrCodeUrl(dataUrl);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setPaymentQrCodeUrl("");
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isPaymentModalOpen, pixPayload]);
-
-  async function handleCopyPaymentValue(value: string, type: "key" | "payload") {
-    try {
-      await navigator.clipboard.writeText(value);
-      setPaymentCopyFeedback(type);
-      window.setTimeout(() => setPaymentCopyFeedback(null), 1800);
-    } catch {
-      setPaymentCopyFeedback(null);
-    }
-  }
 
   return (
     <>
@@ -174,18 +119,17 @@ export function MyEnrollmentActions({
       {(isPaymentModalOpen ||
         isCancelPendingModalOpen ||
         isRefundModalOpen) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 bg-white">
               <h3 className="text-lg font-bold text-slate-950">{modalTitle}</h3>
               <button
                 aria-label="Fechar modal"
-                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-slate-700 transition hover:bg-slate-50"
                 onClick={() => {
                   setIsPaymentModalOpen(false);
                   setIsCancelPendingModalOpen(false);
                   setIsRefundModalOpen(false);
-                  setPaymentCopyFeedback(null);
                   setCancelPendingConfirmError(null);
                   setRefundConfirmError(null);
                 }}
@@ -195,99 +139,38 @@ export function MyEnrollmentActions({
               </button>
             </div>
 
-            {isPaymentModalOpen ? (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600">
-                  Escaneie o QR Code ou copie os dados do PIX. Após a confirmação
-                  do organizador, o status será alterado para pago.
-                </p>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Valor</p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">
-                    {formatCurrencyFromCents(priceInCents)}
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+              {isPaymentModalOpen ? (
+                <div className="space-y-4">
+                  <p className="text-xs text-slate-600">
+                    Realize o pagamento via PIX para garantir sua vaga no racha. O
+                    organizador confirmará sua inscrição após o recebimento.
                   </p>
-                </div>
 
-                <div className="flex flex-col items-center gap-4 rounded-2xl border border-teal-200 bg-teal-50 p-4">
-                  {paymentQrCodeUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      alt={`QR Code PIX para ${rachaTitle}`}
-                      className="h-64 w-64 rounded-2xl border border-white bg-white p-3"
-                      src={paymentQrCodeUrl}
-                    />
-                  ) : (
-                    <div className="flex h-64 w-64 items-center justify-center rounded-2xl border border-dashed border-teal-300 bg-white text-sm text-slate-500">
-                      Gerando QR Code PIX...
-                    </div>
-                  )}
+                  <PixPaymentCard
+                    organizerDisplayName={organizerDisplayName}
+                    pixKey={pixKey}
+                    priceInCents={priceInCents}
+                    rachaCity={rachaCity}
+                    rachaTitle={rachaTitle}
+                  />
 
-                  <p className="text-center text-sm text-teal-900">
-                    Use o app do banco para escanear e pagar exatamente o valor do racha.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                  <p className="font-semibold text-slate-950">Chave PIX</p>
-                  <p className="mt-2 break-all">{pixKey}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  {paymentDeadline ? (
+                    <p className="text-xs text-slate-600">
+                      Prazo para pagamento: <strong>{paymentDeadline}</strong>
+                    </p>
+                  ) : null}
+                  <div className="flex justify-end pt-2 pb-1">
                     <Button
-                      onClick={() => handleCopyPaymentValue(pixKey, "key")}
-                      size="sm"
+                      onClick={() => setIsPaymentModalOpen(false)}
                       type="button"
                       variant="outline"
                     >
-                      {paymentCopyFeedback === "key" ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Chave copiada
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copiar chave
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={() => handleCopyPaymentValue(pixPayload, "payload")}
-                      disabled={!pixPayload}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {paymentCopyFeedback === "payload" ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          PIX copiado
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copiar PIX copia e cola
-                        </>
-                      )}
+                      Fechar
                     </Button>
                   </div>
                 </div>
-
-                {paymentDeadline ? (
-                  <p className="text-sm text-slate-600">
-                    Prazo para pagamento: <strong>{paymentDeadline}</strong>
-                  </p>
-                ) : null}
-                <div className="flex justify-end">
-                  <Button
-                    onClick={() => setIsPaymentModalOpen(false)}
-                    type="button"
-                    variant="outline"
-                  >
-                    Entendi
-                  </Button>
-                </div>
-              </div>
-            ) : null}
+              ) : null}
 
             {isCancelPendingModalOpen ? (
               <form
@@ -476,6 +359,7 @@ export function MyEnrollmentActions({
                 </div>
               </form>
             ) : null}
+            </div>
           </div>
         </div>
       )}

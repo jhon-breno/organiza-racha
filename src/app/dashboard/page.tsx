@@ -1,37 +1,30 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ParticipantStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import {
   updateOrganizerDataSettingsAction,
   updateOrganizerPixSettingsAction,
 } from "@/actions";
-import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
-import { ConfirmedListModal } from "@/components/confirmed-list-modal";
-import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
-import { EmptyState } from "@/components/empty-state";
 import { FlashMessage } from "@/components/flash-message";
 import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
-import { PendingPaymentsModal } from "@/components/pending-payments-modal";
 import { NewRachaTypeDialog } from "@/components/new-racha-type-dialog";
 import { AddUserDialog } from "@/components/add-user-dialog";
 import { DashboardRachaList } from "@/components/dashboard-racha-list";
-import { ShareRachaButton } from "@/components/share-racha-button";
-import { Badge } from "@/components/ui/badge";
+import { PixPaymentCard } from "@/components/pix-payment-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SubmitButton } from "@/components/submit-button";
-import { modalityLabels, SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import {
   isAwaitingPaymentEnrollment,
   isConfirmedEnrollment,
   isGoalkeeperEnrollment,
-  isVisibleEnrollment,
 } from "@/lib/enrollment";
 import { prisma } from "@/lib/prisma";
-import { formatCurrencyFromCents, formatDateTimeShort } from "@/lib/utils";
+
 
 type SearchParams = Promise<{
   status?: string;
@@ -135,7 +128,6 @@ export default async function DashboardPage({
       })
     : [];
   const adminRachaIds = adminRachaLinks.map((item) => item.rachaId);
-  const adminRachaIdSet = new Set(adminRachaIds);
 
   const rachas = await prisma.racha.findMany({
     where: {
@@ -310,6 +302,22 @@ export default async function DashboardPage({
               <SubmitButton pendingLabel="Salvando...">Salvar PIX</SubmitButton>
             </div>
           </form>
+
+          {organizerPixKey ? (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Prévia do PIX Copia e Cola / QR Code
+              </p>
+              <PixPaymentCard
+                organizerDisplayName={organizerPixHolderName || organizerName || "ORGANIZADOR"}
+                pixBankName={organizerPixBankName}
+                pixHolderName={organizerPixHolderName}
+                pixKey={organizerPixKey}
+                priceInCents={100}
+                rachaTitle="Racha de Demonstração"
+              />
+            </div>
+          ) : null}
         </Card>
       </div>
 

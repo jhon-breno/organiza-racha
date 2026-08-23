@@ -72,6 +72,14 @@ export const rachaFormSchema = z
       .int()
       .min(1, "O prazo mínimo é de 1 hora.")
       .max(48, "O prazo máximo é de 48 horas."),
+    autoNotifyReminder: z.coerce.boolean().optional(),
+    autoNotifyHoursBefore: z.coerce
+      .number()
+      .int()
+      .min(1, "O tempo mínimo é de 1 hora antes.")
+      .max(72, "O tempo máximo é de 72 horas antes.")
+      .optional()
+      .or(z.literal("")),
     // Futebol
     futebolType: z.string().optional().or(z.literal("")),
     goalkeeperLimit: z.coerce

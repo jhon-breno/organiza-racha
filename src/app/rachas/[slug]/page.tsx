@@ -4,6 +4,7 @@ import { MessageCircleIcon, Users } from "lucide-react";
 import { auth } from "@/auth";
 import { FlashMessage } from "@/components/flash-message";
 import { JoinRachaForm } from "@/components/join-racha-form";
+import { MyEnrollmentActions } from "@/components/my-enrollment-actions";
 import { QuickJoinModal } from "@/components/quick-join-modal";
 import { ShareRachaButton } from "@/components/share-racha-button";
 import { MapPreview } from "@/components/map-preview";
@@ -327,9 +328,18 @@ export default async function RachaDetailsPage({
                 {paymentStatusLabels[myEnrollment.paymentStatus] ??
                   myEnrollment.paymentStatus}
               </p>
-              <Button asChild href="/minhas-inscricoes" variant="outline">
-                Ver minhas inscrições
-              </Button>
+              <MyEnrollmentActions
+                enrollmentId={myEnrollment.id}
+                enrollmentStatus={myEnrollment.status}
+                organizerDisplayName={organizerDisplayName}
+                participantPosition={myEnrollment.participantPosition}
+                paymentStatus={myEnrollment.paymentStatus}
+                pixKey={racha.pixKey}
+                priceInCents={racha.priceInCents}
+                rachaCity={racha.city}
+                rachaSlug={racha.slug}
+                rachaTitle={racha.title}
+              />
             </Card>
           ) : !isPublishedForEnrollment ? (
             <Card className="space-y-4 border-amber-200 bg-amber-50">

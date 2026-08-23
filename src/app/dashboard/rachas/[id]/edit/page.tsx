@@ -183,12 +183,6 @@ export default async function EditRachaPage({
 
       <RachaForm defaultValues={racha} />
 
-      <RachaAdminManagement
-        admins={racha.rachaAdmins}
-        organizer={racha.organizer}
-        rachaId={racha.id}
-      />
-
       <section className="space-y-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-950">
@@ -319,6 +313,12 @@ export default async function EditRachaPage({
           rachaId={racha.id}
         />
       </section>
+
+      <RachaAdminManagement
+        admins={racha.rachaAdmins}
+        organizer={racha.organizer}
+        rachaId={racha.id}
+      />
     </div>
   );
 }

@@ -2,8 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import {
+  Calendar,
+  Coins,
+  Edit3,
+  ExternalLink,
+  MapPin,
+  MessageCircle,
+  Users,
+  X,
+} from "lucide-react";
 import { createRachaAction, updateRachaAction } from "@/actions";
 import { SubmitButton } from "@/components/submit-button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +27,13 @@ import {
   voleiTypeOptions,
   voleiTypesWithSetter,
 } from "@/lib/constants";
-import { formatDateInput, formatTimeInput } from "@/lib/utils";
+import {
+  formatCurrencyFromCents,
+  formatDateInput,
+  formatDateTime,
+  formatDateTimeShort,
+  formatTimeInput,
+} from "@/lib/utils";
 
 type RachaFormValues = {
   id?: string;
@@ -40,6 +57,9 @@ type RachaFormValues = {
   visibility?: string;
   accessKey?: string | null;
   cancellationWindowHours?: number;
+  autoNotifyReminder?: boolean;
+  autoNotifyHoursBefore?: number | null;
+  reminderSentAt?: Date | null;
   futebolType?: string | null;
   goalkeeperLimit?: number | null;
   voleiType?: string | null;
@@ -77,6 +97,9 @@ export function RachaForm({
   const [isFree, setIsFree] = useState(
     defaultValues ? defaultValues.priceInCents === 0 : false,
   );
+  const [autoNotifyReminder, setAutoNotifyReminder] = useState(
+    defaultValues?.autoNotifyReminder ?? false,
+  );
 
   const isFutebol = modality === "FUTEBOL";
   const isVolei = modality === "VOLEI";
@@ -84,6 +107,10 @@ export function RachaForm({
   const showSetterLimit =
     isVolei && hasFixedSetter && voleiTypesWithSetter.has(voleiType);
   const minEventDate = formatDateInput(new Date());
+
+  const [isEditingOpen, setIsEditingOpen] = useState(
+    !isEditing || hasValidationError || searchParams.get("edit") === "true",
+  );
 
   function saveDraftSnapshot() {
     if (!formRef.current) {
@@ -203,6 +230,209 @@ export function RachaForm({
     visibility,
   ]);
 
+  if (isEditing && !isEditingOpen && defaultValues) {
+    const modalityLabel =
+      modalities.find((m) => m.value === (defaultValues.modality ?? "FUTEBOL"))
+        ?.label ?? defaultValues.modality;
+    const futebolLabel = futebolTypeOptions.find(
+      (f) => f.value === defaultValues.futebolType,
+    )?.label;
+    const voleiLabel = voleiTypeOptions.find(
+      (v) => v.value === defaultValues.voleiType,
+    )?.label;
+    const isFreeRacha = defaultValues.priceInCents === 0;
+
+    return (
+      <Card className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-slate-900 text-white font-semibold">
+                {modalityLabel}
+              </Badge>
+              {futebolLabel && (
+                <Badge className="border border-slate-200 bg-white text-slate-700 font-semibold">
+                  {futebolLabel}
+                </Badge>
+              )}
+              {voleiLabel && (
+                <Badge className="border border-slate-200 bg-white text-slate-700 font-semibold">
+                  {voleiLabel}
+                </Badge>
+              )}
+              <Badge
+                className={
+                  defaultValues.visibility === "PRIVATE"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-emerald-100 text-emerald-800"
+                }
+              >
+                {defaultValues.visibility === "PRIVATE"
+                  ? "Privado"
+                  : "Público"}
+              </Badge>
+            </div>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">
+              Informações do Racha
+            </h2>
+            <p className="text-xs text-slate-500">
+              Configurações operacionais, local, regras e pagamentos.
+            </p>
+          </div>
+
+          <Button
+            onClick={() => setIsEditingOpen(true)}
+            type="button"
+            className="flex items-center gap-2 font-bold shadow-xs"
+          >
+            <Edit3 className="h-4 w-4" />
+            Editar racha
+          </Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Calendar className="h-3.5 w-3.5 text-teal-600" />
+              Data e Horário
+            </div>
+            <p className="text-sm font-bold text-slate-900">
+              {defaultValues.eventDate
+                ? formatDateTime(
+                    defaultValues.eventDate,
+                    defaultValues.eventEndDate,
+                  )
+                : "Não definido"}
+            </p>
+            {defaultValues.cancellationWindowHours ? (
+              <p className="text-xs text-slate-500">
+                Desistência até {defaultValues.cancellationWindowHours}h antes
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <MapPin className="h-3.5 w-3.5 text-rose-600" />
+              Local
+            </div>
+            <p className="text-sm font-bold text-slate-900 truncate">
+              {defaultValues.locationName || "Local não informado"}
+            </p>
+            <p className="text-xs text-slate-600 truncate">
+              {defaultValues.address}
+              {defaultValues.city ? `, ${defaultValues.city}` : ""}
+              {defaultValues.state ? ` - ${defaultValues.state}` : ""}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Users className="h-3.5 w-3.5 text-indigo-600" />
+              Vagas e Formato
+            </div>
+            <p className="text-sm font-bold text-slate-900">
+              {defaultValues.athleteLimit} atletas{" "}
+              {defaultValues.modality === "FUTEBOL" ? "de linha" : "totais"}
+            </p>
+            <p className="text-xs text-slate-600">
+              {defaultValues.modality === "FUTEBOL" &&
+              defaultValues.goalkeeperLimit
+                ? `${defaultValues.goalkeeperLimit} goleiro(s) por time`
+                : defaultValues.modality === "VOLEI" &&
+                    defaultValues.hasFixedSetter &&
+                    defaultValues.setterLimit
+                  ? `${defaultValues.setterLimit} levantador(es) fixo(s)`
+                  : "Sem funções especiais"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Coins className="h-3.5 w-3.5 text-emerald-600" />
+              Valor da Inscrição
+            </div>
+            <p className="text-sm font-bold text-slate-900">
+              {isFreeRacha
+                ? "100% Gratuito"
+                : formatCurrencyFromCents(defaultValues.priceInCents ?? 0)}
+            </p>
+            {!isFreeRacha && defaultValues.paymentDeadline ? (
+              <p className="text-xs text-slate-500">
+                Pagar até:{" "}
+                {formatDateTimeShort(defaultValues.paymentDeadline)}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {defaultValues.whatsappGroupUrl ? (
+          <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs text-emerald-950">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-emerald-700 shrink-0" />
+              <span className="font-semibold text-emerald-900">
+                Grupo do WhatsApp do Racha ativo
+              </span>
+            </div>
+            <a
+              href={defaultValues.whatsappGroupUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-bold text-emerald-800 hover:underline"
+            >
+              Abrir link <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        ) : null}
+
+        {defaultValues.autoNotifyReminder ? (
+          <div className="flex items-center justify-between rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-xs text-blue-950">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-blue-600 shrink-0" />
+              <span className="font-semibold text-blue-900">
+                Lembrete automático via WhatsApp ativo:{" "}
+                {defaultValues.autoNotifyHoursBefore ?? 2}h antes do jogo
+              </span>
+            </div>
+            {defaultValues.reminderSentAt ? (
+              <span className="font-bold text-emerald-700">
+                Enviado em {formatDateTimeShort(defaultValues.reminderSentAt)}
+              </span>
+            ) : (
+              <span className="text-blue-700">Aguardando horário</span>
+            )}
+          </div>
+        ) : null}
+
+        {defaultValues.description || defaultValues.rules ? (
+          <div className="grid gap-4 md:grid-cols-2 text-sm">
+            {defaultValues.description ? (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 space-y-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Descrição
+                </span>
+                <p className="text-slate-700 text-xs leading-relaxed whitespace-pre-line">
+                  {defaultValues.description}
+                </p>
+              </div>
+            ) : null}
+
+            {defaultValues.rules ? (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 space-y-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Regras do Racha
+                </span>
+                <p className="text-slate-700 text-xs leading-relaxed whitespace-pre-line">
+                  {defaultValues.rules}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Card>
+    );
+  }
+
   return (
     <form
       action={action}
@@ -215,15 +445,31 @@ export function RachaForm({
       ) : null}
 
       <Card className="space-y-6">
-        <div className="space-y-2">
-          <Badge>Dados principais</Badge>
-          <h2 className="text-2xl font-bold text-slate-950">
-            {isEditing ? "Editar racha" : "Criar um novo racha"}
-          </h2>
-          <p className="text-sm text-slate-600">
-            Preencha as informações públicas e operacionais para publicar o
-            racha.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
+          <div className="space-y-1">
+            <Badge>{isEditing ? "Edição do Racha" : "Dados principais"}</Badge>
+            <h2 className="text-2xl font-bold text-slate-950">
+              {isEditing ? "Editar configurações do racha" : "Criar um novo racha"}
+            </h2>
+            <p className="text-sm text-slate-600">
+              {isEditing
+                ? "Atualize as informações operacionais, datas, local e regras deste racha."
+                : "Preencha as informações públicas e operacionais para publicar o racha."}
+            </p>
+          </div>
+
+          {isEditing ? (
+            <Button
+              onClick={() => setIsEditingOpen(false)}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5"
+            >
+              <X className="h-4 w-4" />
+              Recolher edição
+            </Button>
+          ) : null}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -709,12 +955,92 @@ export function RachaForm({
         </div>
       </Card>
 
-      <div className="flex flex-wrap gap-3">
+      <Card className="space-y-6">
+        <div>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-emerald-600 text-white font-semibold">
+              WhatsApp BotBot
+            </Badge>
+            {defaultValues?.reminderSentAt ? (
+              <Badge className="border border-emerald-300 bg-emerald-50 text-emerald-800">
+                Lembrete já disparado
+              </Badge>
+            ) : null}
+          </div>
+          <h3 className="mt-2 text-xl font-bold text-slate-950">
+            Lembrete Automático Pré-Jogo via WhatsApp
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Configure o disparo automático de lembrete no WhatsApp para os atletas confirmados na lista oficial antes da partida.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <input
+              checked={autoNotifyReminder}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              name="autoNotifyReminder"
+              onChange={(e) => setAutoNotifyReminder(e.target.checked)}
+              type="checkbox"
+              value="true"
+            />
+            <div className="space-y-1">
+              <span className="font-bold text-slate-900">
+                Ativar envio de lembrete automático no WhatsApp
+              </span>
+              <p className="text-xs text-slate-600">
+                O sistema enviará a notificação para os atletas confirmados (exclui lista de espera e cancelados), contendo local, data, hora e link para desistência se necessário.
+              </p>
+            </div>
+          </label>
+
+          {autoNotifyReminder ? (
+            <div className="grid gap-4 md:grid-cols-2 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                Horas de antecedência para disparo
+                <Input
+                  defaultValue={defaultValues?.autoNotifyHoursBefore ?? 2}
+                  min={1}
+                  max={72}
+                  name="autoNotifyHoursBefore"
+                  type="number"
+                  required
+                />
+                <span className="block text-xs text-slate-500">
+                  Ex.: 2 horas antes do início do racha.
+                </span>
+              </label>
+
+              <div className="flex flex-col justify-center text-xs text-slate-600 space-y-1">
+                <p className="font-bold text-slate-900">🛡️ Proteção Anti-Spam:</p>
+                <p>
+                  As notificações em massa são enviadas com intervalo de 20 segundos entre cada participante para evitar restrições no número do WhatsApp.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <input name="autoNotifyHoursBefore" type="hidden" value="" />
+          )}
+        </div>
+      </Card>
+
+      <div className="flex flex-wrap items-center gap-3">
         <SubmitButton
           pendingLabel={isEditing ? "Atualizando..." : "Criando..."}
         >
           {isEditing ? "Salvar alterações" : "Publicar racha"}
         </SubmitButton>
+
+        {isEditing ? (
+          <Button
+            onClick={() => setIsEditingOpen(false)}
+            type="button"
+            variant="outline"
+          >
+            Cancelar
+          </Button>
+        ) : null}
       </div>
     </form>
   );

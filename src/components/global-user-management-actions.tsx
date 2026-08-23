@@ -200,15 +200,10 @@ function DeleteUserModal({
 export function GlobalUserManagementActions({
   user,
 }: GlobalUserManagementActionsProps) {
-  const [isMounted, setIsMounted] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
   const [openPassword, setOpenPassword] = useState(false);
   const passwordRef = useRef<HTMLFormElement | null>(null);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!openPassword) {
@@ -356,14 +351,14 @@ export function GlobalUserManagementActions({
         </form>
       ) : null}
 
-      {isMounted && openEdit
+      {openEdit && typeof document !== "undefined"
         ? createPortal(
             <EditUserModal onClose={() => setOpenEdit(false)} user={user} />,
             document.body,
           )
         : null}
 
-      {isMounted && openDelete
+      {openDelete && typeof document !== "undefined"
         ? createPortal(
             <DeleteUserModal
               onClose={() => setOpenDelete(false)}

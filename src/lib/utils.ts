@@ -26,7 +26,7 @@ function getTimeZoneFormatter(
   });
 }
 
-function getTimeZoneParts(date: Date | string | number) {
+export function getTimeZoneParts(date: Date | string | number) {
   const normalized = normalizeDateValue(date);
   const formatter = getTimeZoneFormatter(
     {

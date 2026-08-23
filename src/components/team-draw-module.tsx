@@ -1460,7 +1460,10 @@ export function TeamDrawModule({
                                 >
                                   <span className="min-w-0 flex-1">
                                     <span className="flex flex-wrap items-center gap-1.5 font-medium leading-5 break-words">
-                                      {setter.participantName}
+                                      {getDisplayName(
+                                        setter.participantName,
+                                        setter.participantNickname,
+                                      )}
                                       {isFemale ? (
                                         <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
                                           Feminino
@@ -1513,7 +1516,10 @@ export function TeamDrawModule({
                                   <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold leading-5 text-slate-950">
                                     <span className="break-words">
                                       {participantIndex + 1}.{" "}
-                                      {participant.participantName}
+                                      {getDisplayName(
+                                        participant.participantName,
+                                        participant.participantNickname,
+                                      )}
                                     </span>
                                     {isFemale ? (
                                       <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[10px] font-bold text-pink-700">
@@ -1572,7 +1578,10 @@ export function TeamDrawModule({
                                   type="button"
                                 >
                                   <span className="min-w-0 flex-1 break-words font-medium leading-5">
-                                    {goalkeeper.participantName}
+                                    {getDisplayName(
+                                      goalkeeper.participantName,
+                                      goalkeeper.participantNickname,
+                                    )}
                                   </span>
                                   <span className="shrink-0 text-right text-xs text-amber-700">
                                     <span className="font-semibold tracking-tight">

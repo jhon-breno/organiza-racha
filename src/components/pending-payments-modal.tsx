@@ -127,9 +127,9 @@ export function PendingPaymentsModal({
       </Button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4">
-          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
                   Gerenciar pagamentos
@@ -149,7 +149,7 @@ export function PendingPaymentsModal({
               </button>
             </div>
 
-            <div className="max-h-[70vh] space-y-3 overflow-y-auto px-5 py-5">
+            <div className="flex-1 min-h-0 space-y-3 overflow-y-auto px-5 py-5">
               {enrollments.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
                   Não há participantes aguardando pagamento neste racha.

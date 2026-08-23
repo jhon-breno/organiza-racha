@@ -51,6 +51,16 @@ import {
   getPrivateRachaAccessCookieName,
   slugify,
 } from "@/lib/utils";
+import {
+  buildAthleteCancellationMessage,
+  buildFreeEnrollmentConfirmationMessage,
+  buildOrganizerRefundAlertMessage,
+  buildPaymentConfirmedMessage,
+  buildRachaReminderMessage,
+  sendBotbotWhatsappMessage,
+  sendBotbotWhatsappMessages,
+  sendPaidEnrollmentWhatsappNotification,
+} from "@/lib/botbot";
 
 function getStringValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -360,11 +370,19 @@ async function createOrganizerEnrollmentForRacha(input: {
   racha: {
     id: string;
     slug: string;
+    title: string;
     modality: string;
     organizerId: string;
     eventDate: Date;
+    eventEndDate?: Date | null;
+    locationName: string;
+    address?: string | null;
+    city?: string | null;
     athleteLimit: number;
     priceInCents: number;
+    pixKey?: string | null;
+    phoneWhatsapp?: string | null;
+    organizerDisplayName?: string | null;
     goalkeeperLimit: number | null;
     hasFixedSetter: boolean;
     setterLimit: number | null;
@@ -495,6 +513,63 @@ async function createOrganizerEnrollmentForRacha(input: {
       paymentStatus: nextPaymentStatus,
     },
   });
+
+  // Notifica o participante via WhatsApp (BotBot) em segundo plano
+  try {
+    const userWithNick = await prisma.user.findUnique({
+      where: { id: participantUser.id },
+      select: { nickname: true },
+    });
+    const organizerUser = await prisma.user.findUnique({
+      where: { id: input.racha.organizerId },
+      select: { pixHolderName: true, name: true, phone: true },
+    });
+    const isFreeOrGoalkeeper = isFree || isGoalkeeperEnrollment;
+
+    if (isFreeOrGoalkeeper) {
+      const message = buildFreeEnrollmentConfirmationMessage({
+        participantName: input.enrollment.participantName,
+        participantNickname: userWithNick?.nickname,
+        rachaTitle: input.racha.title,
+        rachaSlug: input.racha.slug,
+        eventDate: input.racha.eventDate,
+        eventEndDate: input.racha.eventEndDate,
+        locationName: input.racha.locationName,
+        address: input.racha.address,
+      });
+
+      sendBotbotWhatsappMessage({
+        to: normalizedPhone,
+        message,
+      }).catch((err) => {
+        console.warn("Aviso ao notificar participante por WhatsApp:", err);
+      });
+    } else {
+      sendPaidEnrollmentWhatsappNotification({
+        to: normalizedPhone,
+        details: {
+          participantName: input.enrollment.participantName,
+          participantNickname: userWithNick?.nickname,
+          rachaTitle: input.racha.title,
+          rachaSlug: input.racha.slug,
+          eventDate: input.racha.eventDate,
+          eventEndDate: input.racha.eventEndDate,
+          locationName: input.racha.locationName,
+          address: input.racha.address,
+          rachaCity: input.racha.city,
+          priceInCents: input.racha.priceInCents,
+          pixKey: input.racha.pixKey,
+          pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
+          organizerDisplayName: input.racha.organizerDisplayName,
+          organizerPhoneWhatsapp: organizerUser?.phone || input.racha.phoneWhatsapp,
+        },
+      }).catch((err) => {
+        console.warn("Aviso ao notificar participante por WhatsApp:", err);
+      });
+    }
+  } catch (error) {
+    console.warn("Erro ao agendar notificação WhatsApp:", error);
+  }
 
   return {
     nextStatus,
@@ -2275,6 +2350,72 @@ export async function joinRachaAction(formData: FormData) {
     });
   }
 
+  // Notifica o participante via WhatsApp (BotBot) em segundo plano
+  try {
+    const userWithNick = await prisma.user.findUnique({
+      where: { id: participantUser.id },
+      select: { nickname: true },
+    });
+    const organizerUser = await prisma.user.findUnique({
+      where: { id: racha.organizerId },
+      select: { pixHolderName: true, name: true, phone: true },
+    });
+    const isFreeOrGoalkeeper = isFree || isGoalkeeperEnrollment;
+
+    if (isFreeOrGoalkeeper) {
+      const message = buildFreeEnrollmentConfirmationMessage({
+        participantName: parsed.data.participantName,
+        participantNickname: userWithNick?.nickname,
+        rachaTitle: racha.title,
+        rachaSlug: racha.slug,
+        eventDate: racha.eventDate,
+        eventEndDate: racha.eventEndDate,
+        locationName: racha.locationName,
+        address: racha.address,
+      });
+
+      sendBotbotWhatsappMessage({
+        to: normalizedPhone,
+        message,
+      }).catch((err) => {
+        console.warn(
+          "Aviso ao notificar participante por WhatsApp na auto-inscrição:",
+          err,
+        );
+      });
+    } else {
+      sendPaidEnrollmentWhatsappNotification({
+        to: normalizedPhone,
+        details: {
+          participantName: parsed.data.participantName,
+          participantNickname: userWithNick?.nickname,
+          rachaTitle: racha.title,
+          rachaSlug: racha.slug,
+          eventDate: racha.eventDate,
+          eventEndDate: racha.eventEndDate,
+          locationName: racha.locationName,
+          address: racha.address,
+          rachaCity: racha.city,
+          priceInCents: racha.priceInCents,
+          pixKey: racha.pixKey,
+          pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
+          organizerDisplayName: racha.organizerDisplayName,
+          organizerPhoneWhatsapp: organizerUser?.phone || racha.phoneWhatsapp,
+        },
+      }).catch((err) => {
+        console.warn(
+          "Aviso ao notificar participante por WhatsApp na auto-inscrição:",
+          err,
+        );
+      });
+    }
+  } catch (error) {
+    console.warn(
+      "Erro ao agendar notificação WhatsApp na auto-inscrição:",
+      error,
+    );
+  }
+
   revalidatePath(callbackUrl);
   if (session?.user?.id) {
     revalidatePath("/minhas-inscricoes");
@@ -2748,6 +2889,9 @@ export async function updateOrganizerEnrollmentStatusAction(
     );
   }
 
+  const wasNotPaid = enrollment.paymentStatus !== PaymentStatus.PAID;
+  const isNowPaid = parsed.data.paymentStatus === PaymentStatus.PAID;
+
   await prisma.enrollment.update({
     where: { id: enrollment.id },
     data: buildEnrollmentStatusUpdate({
@@ -2757,6 +2901,48 @@ export async function updateOrganizerEnrollmentStatusAction(
       refundRequestedAt: enrollment.refundRequestedAt,
     }),
   });
+
+  if (wasNotPaid && isNowPaid && parsed.data.status === ParticipantStatus.ACTIVE) {
+    try {
+      const activeEnrollments = await prisma.enrollment.findMany({
+        where: {
+          rachaId: enrollment.rachaId,
+          status: ParticipantStatus.ACTIVE,
+        },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      const spotIndex = activeEnrollments.findIndex((e) => e.id === enrollment.id);
+      const spotNumber = spotIndex >= 0 ? spotIndex + 1 : 1;
+
+      const userWithNick = enrollment.userId
+        ? await prisma.user.findUnique({
+            where: { id: enrollment.userId },
+            select: { nickname: true },
+          })
+        : null;
+
+      sendBotbotWhatsappMessage({
+        to: enrollment.participantPhone,
+        message: buildPaymentConfirmedMessage({
+          participantName: enrollment.participantName,
+          participantNickname: userWithNick?.nickname,
+          rachaTitle: enrollment.racha.title,
+          rachaSlug: enrollment.racha.slug,
+          eventDate: enrollment.racha.eventDate,
+          eventEndDate: enrollment.racha.eventEndDate,
+          locationName: enrollment.racha.locationName,
+          address: enrollment.racha.address,
+          spotNumber,
+          maxAthletes: enrollment.racha.athleteLimit,
+        }),
+      }).catch((err) => {
+        console.warn("Aviso ao notificar confirmação de pagamento via WhatsApp:", err);
+      });
+    } catch (err) {
+      console.warn("Erro ao agendar notificação WhatsApp de pagamento confirmado:", err);
+    }
+  }
 
   await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
 
@@ -3151,6 +3337,53 @@ export async function cancelEnrollmentAction(formData: FormData) {
     },
   });
 
+  // Notifica o atleta e o organizador sobre o cancelamento com reembolso
+  try {
+    const userWithNick = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { nickname: true },
+    });
+
+    // 1. Mensagem para o atleta
+    sendBotbotWhatsappMessage({
+      to: enrollment.participantPhone,
+      message: buildAthleteCancellationMessage({
+        participantName: enrollment.participantName,
+        participantNickname: userWithNick?.nickname,
+        rachaTitle: enrollment.racha.title,
+        rachaSlug: enrollment.racha.slug,
+        eventDate: enrollment.racha.eventDate,
+        wasPaid: true,
+        priceInCents: enrollment.racha.priceInCents,
+      }),
+    }).catch((err) => {
+      console.warn("Aviso ao notificar cancelamento do atleta:", err);
+    });
+
+    // 2. Mensagem de alerta de reembolso para o organizador
+    if (enrollment.racha.phoneWhatsapp) {
+      sendBotbotWhatsappMessage({
+        to: enrollment.racha.phoneWhatsapp,
+        message: buildOrganizerRefundAlertMessage({
+          organizerPhone: enrollment.racha.phoneWhatsapp,
+          athleteName: enrollment.participantName,
+          athleteNickname: userWithNick?.nickname,
+          athletePhone: enrollment.participantPhone,
+          rachaTitle: enrollment.racha.title,
+          rachaSlug: enrollment.racha.slug,
+          eventDate: enrollment.racha.eventDate,
+          priceInCents: enrollment.racha.priceInCents,
+          refundPixKey: parsed.data.refundPixKey,
+          refundReason: parsed.data.refundReason,
+        }),
+      }).catch((err) => {
+        console.warn("Aviso ao notificar organizador sobre reembolso:", err);
+      });
+    }
+  } catch (err) {
+    console.warn("Erro ao agendar notificações WhatsApp de reembolso:", err);
+  }
+
   await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
 
   revalidatePath("/minhas-inscricoes");
@@ -3188,6 +3421,7 @@ export async function cancelPendingEnrollmentAction(formData: FormData) {
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: parsed.data.enrollmentId },
+    include: { racha: true },
   });
 
   if (!enrollment || enrollment.userId !== user.id) {
@@ -3220,10 +3454,34 @@ export async function cancelPendingEnrollmentAction(formData: FormData) {
     },
   });
 
+  // Notifica o atleta do cancelamento sem custo
+  try {
+    const userWithNick = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { nickname: true },
+    });
+
+    sendBotbotWhatsappMessage({
+      to: enrollment.participantPhone,
+      message: buildAthleteCancellationMessage({
+        participantName: enrollment.participantName,
+        participantNickname: userWithNick?.nickname,
+        rachaTitle: enrollment.racha.title,
+        rachaSlug: enrollment.racha.slug,
+        eventDate: enrollment.racha.eventDate,
+        wasPaid: false,
+      }),
+    }).catch((err) => {
+      console.warn("Aviso ao notificar cancelamento gratuito:", err);
+    });
+  } catch (err) {
+    console.warn("Erro ao agendar notificação de cancelamento:", err);
+  }
+
   await promoteWaitlistEnrollmentsIfSlotsAvailable(enrollment.rachaId);
 
   revalidatePath("/minhas-inscricoes");
-  revalidatePath(`/rachas/${enrollment.rachaId}`);
+  revalidatePath(`/rachas/${enrollment.racha.slug}`);
   revalidatePath("/dashboard");
 
   redirect(
@@ -3278,6 +3536,47 @@ export async function confirmEnrollmentPaymentAction(formData: FormData) {
       pixPaid: true,
     },
   });
+
+  // Notifica o atleta com o número na lista e quantidade máxima
+  try {
+    const activeEnrollments = await prisma.enrollment.findMany({
+      where: {
+        rachaId: enrollment.rachaId,
+        status: ParticipantStatus.ACTIVE,
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    const spotIndex = activeEnrollments.findIndex((e) => e.id === enrollment.id);
+    const spotNumber = spotIndex >= 0 ? spotIndex + 1 : 1;
+
+    const userWithNick = enrollment.userId
+      ? await prisma.user.findUnique({
+          where: { id: enrollment.userId },
+          select: { nickname: true },
+        })
+      : null;
+
+    sendBotbotWhatsappMessage({
+      to: enrollment.participantPhone,
+      message: buildPaymentConfirmedMessage({
+        participantName: enrollment.participantName,
+        participantNickname: userWithNick?.nickname,
+        rachaTitle: enrollment.racha.title,
+        rachaSlug: enrollment.racha.slug,
+        eventDate: enrollment.racha.eventDate,
+        eventEndDate: enrollment.racha.eventEndDate,
+        locationName: enrollment.racha.locationName,
+        address: enrollment.racha.address,
+        spotNumber,
+        maxAthletes: enrollment.racha.athleteLimit,
+      }),
+    }).catch((err) => {
+      console.warn("Aviso ao notificar confirmação de pagamento via WhatsApp:", err);
+    });
+  } catch (err) {
+    console.warn("Erro ao agendar notificação WhatsApp de pagamento:", err);
+  }
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/rachas/${enrollment.rachaId}/edit`);
@@ -3889,4 +4188,156 @@ export async function toggleOrganizerEnrollmentFemaleAction(
         : "Marcação de mulher removida.",
     ),
   );
+}
+
+export async function sendWhatsappReminderToParticipantAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const enrollmentId = getStringValue(formData, "enrollmentId");
+
+  if (!enrollmentId) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Inscrição não informada."),
+    );
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: {
+      racha: true,
+      user: { select: { nickname: true } },
+    },
+  });
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Participante não encontrado."),
+    );
+  }
+
+  const callbackUrl = `/dashboard/rachas/${enrollment.rachaId}/edit`;
+  const message = buildRachaReminderMessage({
+    participantName: enrollment.participantName,
+    participantNickname: enrollment.user?.nickname,
+    rachaTitle: enrollment.racha.title,
+    rachaSlug: enrollment.racha.slug,
+    eventDate: enrollment.racha.eventDate,
+    eventEndDate: enrollment.racha.eventEndDate,
+    locationName: enrollment.racha.locationName,
+    address: enrollment.racha.address,
+  });
+
+  const result = await sendBotbotWhatsappMessage({
+    to: enrollment.participantPhone,
+    message,
+  });
+
+  const displayName = enrollment.user?.nickname?.trim() || enrollment.participantName;
+
+  if (!result.success) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        `Não foi possível enviar WhatsApp para ${displayName}: ${result.error ?? "Verifique as configurações do BotBot."}`,
+      ),
+    );
+  }
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      `Lembrete enviado via WhatsApp para ${displayName} com sucesso!`,
+    ),
+  );
+}
+
+export async function sendWhatsappReminderToAllParticipantsAction(
+  formData: FormData,
+) {
+  const user = await requireUser("/dashboard");
+  const rachaId = getStringValue(formData, "rachaId");
+
+  if (!rachaId) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não informado."));
+  }
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: rachaId },
+    include: {
+      enrollments: {
+        where: {
+          status: {
+            not: ParticipantStatus.CANCELED,
+          },
+        },
+        include: {
+          user: { select: { nickname: true } },
+        },
+      },
+    },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl("/dashboard", "error", "Racha não encontrado."));
+  }
+
+  const callbackUrl = `/dashboard/rachas/${racha.id}/edit`;
+
+  if (racha.enrollments.length === 0) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Nenhum participante ativo ou na lista de espera para notificar.",
+      ),
+    );
+  }
+
+  const recipients = racha.enrollments.map((enrollment) => ({
+    to: enrollment.participantPhone,
+    message: buildRachaReminderMessage({
+      participantName: enrollment.participantName,
+      participantNickname: enrollment.user?.nickname,
+      rachaTitle: racha.title,
+      rachaSlug: racha.slug,
+      eventDate: racha.eventDate,
+      eventEndDate: racha.eventEndDate,
+      locationName: racha.locationName,
+      address: racha.address,
+    }),
+  }));
+
+  const results = await sendBotbotWhatsappMessages(recipients);
+
+  if (results.sent === 0 && results.failed > 0) {
+    redirect(
+      buildMessageUrl(
+        callbackUrl,
+        "error",
+        "Falha ao enviar notificações via WhatsApp. Verifique as credenciais do BotBot.",
+      ),
+    );
+  }
+
+  const message =
+    results.failed > 0
+      ? `${results.sent} de ${results.total} notificações WhatsApp enviadas com sucesso (${results.failed} falharam).`
+      : `Notificação enviada para todos os ${results.sent} participantes via WhatsApp com sucesso!`;
+
+  redirect(buildMessageUrl(callbackUrl, "success", message));
 }

@@ -113,6 +113,9 @@ model Racha {
   visibility              Visibility     @default(OPEN)
   accessKey               String?
   cancellationWindowHours Int            @default(2)
+  autoNotifyReminder      Boolean        @default(false)
+  autoNotifyHoursBefore   Int?           @default(1)
+  reminderSentAt          DateTime?
   paymentDeadline         DateTime?
   status                  RachaStatus    @default(PUBLISHED)
   isRecurring             Boolean        @default(false)
