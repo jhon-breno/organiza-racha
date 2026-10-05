@@ -116,6 +116,7 @@ model Racha {
   autoNotifyReminder      Boolean        @default(false)
   autoNotifyHoursBefore   Int?           @default(1)
   reminderSentAt          DateTime?
+  notifyEnrollmentConfirmation Boolean        @default(true)
   paymentDeadline         DateTime?
   status                  RachaStatus    @default(PUBLISHED)
   isRecurring             Boolean        @default(false)

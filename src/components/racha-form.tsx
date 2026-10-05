@@ -60,6 +60,7 @@ type RachaFormValues = {
   autoNotifyReminder?: boolean;
   autoNotifyHoursBefore?: number | null;
   reminderSentAt?: Date | null;
+  notifyEnrollmentConfirmation?: boolean | null;
   futebolType?: string | null;
   goalkeeperLimit?: number | null;
   voleiType?: string | null;
@@ -100,6 +101,8 @@ export function RachaForm({
   const [autoNotifyReminder, setAutoNotifyReminder] = useState(
     defaultValues?.autoNotifyReminder ?? false,
   );
+  const [notifyEnrollmentConfirmation, setNotifyEnrollmentConfirmation] =
+    useState(defaultValues?.notifyEnrollmentConfirmation ?? true);
 
   const isFutebol = modality === "FUTEBOL";
   const isVolei = modality === "VOLEI";
@@ -403,6 +406,32 @@ export function RachaForm({
             )}
           </div>
         ) : null}
+
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-xs text-slate-800">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block h-2 w-2 rounded-full shrink-0 ${
+                (defaultValues.notifyEnrollmentConfirmation ?? true)
+                  ? "bg-emerald-600"
+                  : "bg-slate-400"
+              }`}
+            />
+            <span className="font-semibold text-slate-900">
+              Confirmação de inscrição no WhatsApp:{" "}
+              <span
+                className={
+                  (defaultValues.notifyEnrollmentConfirmation ?? true)
+                    ? "text-emerald-700 font-bold"
+                    : "text-slate-500"
+                }
+              >
+                {(defaultValues.notifyEnrollmentConfirmation ?? true)
+                  ? "Ativada"
+                  : "Desativada"}
+              </span>
+            </span>
+          </div>
+        </div>
 
         {defaultValues.description || defaultValues.rules ? (
           <div className="grid gap-4 md:grid-cols-2 text-sm">
@@ -978,6 +1007,25 @@ export function RachaForm({
         <div className="space-y-4">
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <input
+              checked={notifyEnrollmentConfirmation}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              name="notifyEnrollmentConfirmation"
+              onChange={(e) => setNotifyEnrollmentConfirmation(e.target.checked)}
+              type="checkbox"
+              value="true"
+            />
+            <div className="space-y-1">
+              <span className="font-bold text-slate-900">
+                Enviar confirmação de inscrição para o atleta inscrito
+              </span>
+              <p className="text-xs text-slate-600">
+                Dispara automaticamente uma notificação no WhatsApp do atleta com os dados de confirmação ou dados do PIX logo após ele se inscrever.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <input
               checked={autoNotifyReminder}
               className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               name="autoNotifyReminder"
@@ -1022,6 +1070,25 @@ export function RachaForm({
           ) : (
             <input name="autoNotifyHoursBefore" type="hidden" value="" />
           )}
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <input
+              checked={notifyEnrollmentConfirmation}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              name="notifyEnrollmentConfirmation"
+              onChange={(e) => setNotifyEnrollmentConfirmation(e.target.checked)}
+              type="checkbox"
+              value="true"
+            />
+            <div className="space-y-1">
+              <span className="font-bold text-slate-900">
+                Enviar confirmação de inscrição para o atleta inscrito
+              </span>
+              <p className="text-xs text-slate-600">
+                Dispara automaticamente uma mensagem no WhatsApp do atleta com os dados da inscrição (ou instruções de pagamento via PIX para racha pago) no momento em que ele se inscreve.
+              </p>
+            </div>
+          </label>
         </div>
       </Card>
 

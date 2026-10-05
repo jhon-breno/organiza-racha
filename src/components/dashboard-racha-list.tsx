@@ -7,6 +7,7 @@ type EnrollmentWithNickname = Enrollment & {
   user: { nickname: string | null };
 };
 import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
+import { CloseRachaDialog } from "@/components/close-racha-dialog";
 import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { DeleteRachaDialog } from "@/components/delete-racha-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -203,6 +204,13 @@ export function DashboardRachaList({
                     <Button asChild href={`/dashboard/rachas/${racha.id}/edit`}>
                       Gerenciar
                     </Button>
+                    <CloseRachaDialog
+                      callbackUrl="/dashboard"
+                      isEnded={isEnded}
+                      rachaId={racha.id}
+                      rachaTitle={racha.title}
+                      status={racha.status}
+                    />
                   </div>
                 </div>
 

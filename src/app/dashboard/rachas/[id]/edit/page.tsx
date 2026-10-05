@@ -1,11 +1,13 @@
 import { ParticipantStatus } from "@prisma/client";
-import { Shuffle } from "lucide-react";
+import { Lock, Shuffle } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AddAthleteModal } from "@/components/add-athlete-modal";
 import { AllAthletesListModal } from "@/components/all-athletes-list-modal";
+import { CloseRachaDialog } from "@/components/close-racha-dialog";
 import { ConfirmedListModal } from "@/components/confirmed-list-modal";
 import { EnrollmentManagement } from "@/components/enrollment-management";
+import { EnrollmentNotificationToggle } from "@/components/enrollment-notification-toggle";
 import { FlashMessage } from "@/components/flash-message";
 import { PageActionFeedbackController } from "@/components/page-action-feedback-controller";
 import { PendingPaymentsModal } from "@/components/pending-payments-modal";
@@ -164,12 +166,18 @@ export default async function EditRachaPage({
             {racha.title}
           </h1>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <AddAthleteModal modality={racha.modality} rachaId={racha.id} />
           <Button asChild href={`/dashboard/rachas/${racha.id}/sorteio`}>
             <Shuffle className="h-4 w-4" />
             Sortear times
           </Button>
+          <CloseRachaDialog
+            callbackUrl={editPageUrl}
+            rachaId={racha.id}
+            rachaTitle={racha.title}
+            status={racha.status}
+          />
           <Button asChild href={`/rachas/${racha.slug}`} variant="outline">
             Ver página pública
           </Button>
@@ -179,18 +187,48 @@ export default async function EditRachaPage({
         </div>
       </div>
 
+      {racha.status === "COMPLETED" ? (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50/80 p-4 text-amber-950">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+              <Lock className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-bold text-amber-900">Racha Encerrado</p>
+              <p className="text-xs text-amber-800">
+                As novas inscrições públicas para este racha estão bloqueadas. Você pode reabrir o racha para aceitar novas inscrições.
+              </p>
+            </div>
+          </div>
+          <CloseRachaDialog
+            callbackUrl={editPageUrl}
+            rachaId={racha.id}
+            rachaTitle={racha.title}
+            status={racha.status}
+            size="sm"
+          />
+        </div>
+      ) : null}
+
       <FlashMessage status={query.status} message={query.message} />
 
       <RachaForm defaultValues={racha} />
 
       <section className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-950">
-            Participantes e pagamentos
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Confirme PIX, acompanhe lista de espera e finalize reembolsos.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-950">
+              Participantes e pagamentos
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Confirme PIX, acompanhe lista de espera e finalize reembolsos.
+            </p>
+          </div>
+          <EnrollmentNotificationToggle
+            callbackUrl={editPageUrl}
+            enabled={racha.notifyEnrollmentConfirmation ?? true}
+            rachaId={racha.id}
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -311,6 +349,7 @@ export default async function EditRachaPage({
           modality={racha.modality}
           priceInCents={racha.priceInCents}
           rachaId={racha.id}
+          notifyEnrollmentConfirmation={racha.notifyEnrollmentConfirmation ?? true}
         />
       </section>
 

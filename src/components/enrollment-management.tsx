@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import {
-  MessageCircle,
-  SlidersHorizontal,
   ChevronDown,
   ChevronUp,
+  MessageCircle,
+  Send,
+  SlidersHorizontal,
   Users,
 } from "lucide-react";
 import {
@@ -14,10 +15,12 @@ import {
   confirmEnrollmentPaymentAction,
   markEnrollmentRefundedAction,
   removeOrganizerEnrollmentAction,
+  sendEnrollmentConfirmationAction,
   sendWhatsappReminderToAllParticipantsAction,
   sendWhatsappReminderToParticipantAction,
   toggleOrganizerEnrollmentFemaleAction,
   toggleOrganizerNextRachaBlockAction,
+  toggleRachaEnrollmentNotificationAction,
   updateOrganizerEnrollmentLevelAction,
   updateOrganizerEnrollmentPositionAction,
   updateOrganizerEnrollmentStatusAction,
@@ -118,10 +121,12 @@ export function EnrollmentManagement({
   modality,
   priceInCents,
   rachaId,
+  notifyEnrollmentConfirmation = true,
 }: {
   rachaId: string;
   modality: string;
   priceInCents?: number;
+  notifyEnrollmentConfirmation?: boolean;
   enrollments: {
     id: string;
     participantName: string;
@@ -255,6 +260,33 @@ export function EnrollmentManagement({
                 ? "Fechar importação"
                 : "Subir atletas massivamente"}
             </Button>
+
+            <form action={toggleRachaEnrollmentNotificationAction}>
+              <input name="rachaId" type="hidden" value={rachaId} />
+              <SubmitButton
+                variant={notifyEnrollmentConfirmation ? "outline" : "secondary"}
+                size="sm"
+                pendingLabel="Salvando..."
+                className={
+                  notifyEnrollmentConfirmation
+                    ? "border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold"
+                    : "border-slate-300 text-slate-600 hover:bg-slate-100 font-medium"
+                }
+                title="Ativar ou desativar o envio automático de confirmação para atletas inscritos"
+              >
+                <span
+                  className={`inline-block h-2 w-2 rounded-full mr-1.5 shrink-0 ${
+                    notifyEnrollmentConfirmation
+                      ? "bg-emerald-600"
+                      : "bg-slate-400"
+                  }`}
+                />
+                Confirmação WhatsApp:{" "}
+                <span className="font-bold ml-1">
+                  {notifyEnrollmentConfirmation ? "Ativada" : "Desativada"}
+                </span>
+              </SubmitButton>
+            </form>
 
             <form action={sendWhatsappReminderToAllParticipantsAction}>
               <input name="rachaId" type="hidden" value={rachaId} />
@@ -525,6 +557,25 @@ export function EnrollmentManagement({
 
                   {/* Ações Rápidas */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
+                    {/* Botão de Enviar Confirmação de Inscrição */}
+                    <form action={sendEnrollmentConfirmationAction}>
+                      <input
+                        name="enrollmentId"
+                        type="hidden"
+                        value={enrollment.id}
+                      />
+                      <SubmitButton
+                        variant="outline"
+                        size="sm"
+                        pendingLabel="Enviando..."
+                        className="border-blue-200 bg-blue-50/50 text-blue-800 hover:bg-blue-100 hover:text-blue-900 font-semibold"
+                        title={`Enviar confirmação de inscrição via WhatsApp para ${displayName}`}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1 text-blue-600" />
+                        Enviar confirmação
+                      </SubmitButton>
+                    </form>
+
                     {/* Botão de Notificar WhatsApp individual */}
                     <form action={sendWhatsappReminderToParticipantAction}>
                       <input
@@ -540,7 +591,7 @@ export function EnrollmentManagement({
                         title={`Enviar lembrete via WhatsApp para ${displayName}`}
                       >
                         <MessageCircle className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                        Notificar WhatsApp
+                        Lembrete WhatsApp
                       </SubmitButton>
                     </form>
 

@@ -27,6 +27,7 @@ import {
   getPrivateRachaAccessCookieName,
   getRachaCoverImageUrl,
   getInitials,
+  isRachaEnded,
 } from "@/lib/utils";
 import {
   isConfirmedEnrollment,
@@ -113,6 +114,7 @@ export default async function RachaDetailsPage({
     racha.organizerDisplayName || racha.organizer.name || "Organizador";
   const isPublishedForEnrollment =
     Boolean(racha.pixKey.trim()) || racha.priceInCents === 0;
+  const isEnded = isRachaEnded(racha);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -148,6 +150,11 @@ export default async function RachaDetailsPage({
                   Recorrente:{" "}
                   {recurrenceFrequencyLabels[racha.recurrenceFrequency] ??
                     racha.recurrenceFrequency}
+                </Badge>
+              ) : null}
+              {isEnded ? (
+                <Badge className="bg-rose-600 font-bold text-white ring-1 ring-white/20">
+                  Racha Encerrado
                 </Badge>
               ) : null}
             </div>
@@ -242,22 +249,24 @@ export default async function RachaDetailsPage({
 
             <div className="grid gap-3">
               <ShareRachaButton slug={racha.slug} title={racha.title} />
-              <QuickJoinModal
-                hasEnrollment={Boolean(myEnrollment)}
-                isAuthenticated={Boolean(session?.user?.id)}
-                racha={{
-                  id: racha.id,
-                  slug: racha.slug,
-                  title: racha.title,
-                  modality: racha.modality,
-                  eventDate: racha.eventDate,
-                  locationName: racha.locationName,
-                  priceInCents: racha.priceInCents,
-                  athleteLimit: racha.athleteLimit,
-                  confirmedCount: confirmedPaidParticipants.length,
-                  visibility: racha.visibility,
-                }}
-              />
+              {!isEnded ? (
+                <QuickJoinModal
+                  hasEnrollment={Boolean(myEnrollment)}
+                  isAuthenticated={Boolean(session?.user?.id)}
+                  racha={{
+                    id: racha.id,
+                    slug: racha.slug,
+                    title: racha.title,
+                    modality: racha.modality,
+                    eventDate: racha.eventDate,
+                    locationName: racha.locationName,
+                    priceInCents: racha.priceInCents,
+                    athleteLimit: racha.athleteLimit,
+                    confirmedCount: confirmedPaidParticipants.length,
+                    visibility: racha.visibility,
+                  }}
+                />
+              ) : null}
               {racha.phoneWhatsapp ? (
                 <Button
                   asChild
@@ -340,6 +349,20 @@ export default async function RachaDetailsPage({
                 rachaSlug={racha.slug}
                 rachaTitle={racha.title}
               />
+            </Card>
+          ) : isEnded ? (
+            <Card className="space-y-4 border-slate-200 bg-slate-50/90 p-6">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-slate-800 text-white font-semibold">
+                  Racha Encerrado
+                </Badge>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Inscrições Encerradas
+              </h2>
+              <p className="text-sm leading-6 text-slate-600">
+                Este racha foi encerrado pelo organizador. Novas inscrições não estão mais disponíveis para esta partida.
+              </p>
             </Card>
           ) : !isPublishedForEnrollment ? (
             <Card className="space-y-4 border-amber-200 bg-amber-50">

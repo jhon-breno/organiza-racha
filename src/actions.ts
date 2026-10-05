@@ -386,6 +386,7 @@ async function createOrganizerEnrollmentForRacha(input: {
     goalkeeperLimit: number | null;
     hasFixedSetter: boolean;
     setterLimit: number | null;
+    notifyEnrollmentConfirmation?: boolean | null;
   };
   enrollment: {
     participantName: string;
@@ -525,29 +526,11 @@ async function createOrganizerEnrollmentForRacha(input: {
       select: { pixHolderName: true, name: true, phone: true },
     });
     const isFreeOrGoalkeeper = isFree || isGoalkeeperEnrollment;
+    const shouldNotify = input.racha.notifyEnrollmentConfirmation ?? true;
 
-    if (isFreeOrGoalkeeper) {
-      const message = buildFreeEnrollmentConfirmationMessage({
-        participantName: input.enrollment.participantName,
-        participantNickname: userWithNick?.nickname,
-        rachaTitle: input.racha.title,
-        rachaSlug: input.racha.slug,
-        eventDate: input.racha.eventDate,
-        eventEndDate: input.racha.eventEndDate,
-        locationName: input.racha.locationName,
-        address: input.racha.address,
-      });
-
-      sendBotbotWhatsappMessage({
-        to: normalizedPhone,
-        message,
-      }).catch((err) => {
-        console.warn("Aviso ao notificar participante por WhatsApp:", err);
-      });
-    } else {
-      sendPaidEnrollmentWhatsappNotification({
-        to: normalizedPhone,
-        details: {
+    if (shouldNotify) {
+      if (isFreeOrGoalkeeper) {
+        const message = buildFreeEnrollmentConfirmationMessage({
           participantName: input.enrollment.participantName,
           participantNickname: userWithNick?.nickname,
           rachaTitle: input.racha.title,
@@ -556,16 +539,37 @@ async function createOrganizerEnrollmentForRacha(input: {
           eventEndDate: input.racha.eventEndDate,
           locationName: input.racha.locationName,
           address: input.racha.address,
-          rachaCity: input.racha.city,
-          priceInCents: input.racha.priceInCents,
-          pixKey: input.racha.pixKey,
-          pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
-          organizerDisplayName: input.racha.organizerDisplayName,
-          organizerPhoneWhatsapp: organizerUser?.phone || input.racha.phoneWhatsapp,
-        },
-      }).catch((err) => {
-        console.warn("Aviso ao notificar participante por WhatsApp:", err);
-      });
+        });
+
+        sendBotbotWhatsappMessage({
+          to: normalizedPhone,
+          message,
+        }).catch((err) => {
+          console.warn("Aviso ao notificar participante por WhatsApp:", err);
+        });
+      } else {
+        sendPaidEnrollmentWhatsappNotification({
+          to: normalizedPhone,
+          details: {
+            participantName: input.enrollment.participantName,
+            participantNickname: userWithNick?.nickname,
+            rachaTitle: input.racha.title,
+            rachaSlug: input.racha.slug,
+            eventDate: input.racha.eventDate,
+            eventEndDate: input.racha.eventEndDate,
+            locationName: input.racha.locationName,
+            address: input.racha.address,
+            rachaCity: input.racha.city,
+            priceInCents: input.racha.priceInCents,
+            pixKey: input.racha.pixKey,
+            pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
+            organizerDisplayName: input.racha.organizerDisplayName,
+            organizerPhoneWhatsapp: organizerUser?.phone || input.racha.phoneWhatsapp,
+          },
+        }).catch((err) => {
+          console.warn("Aviso ao notificar participante por WhatsApp:", err);
+        });
+      }
     }
   } catch (error) {
     console.warn("Erro ao agendar notificação WhatsApp:", error);
@@ -1707,6 +1711,14 @@ export async function createRachaAction(formData: FormData) {
       formData,
       "cancellationWindowHours",
     ),
+    autoNotifyReminder:
+      formData.get("autoNotifyReminder") === "true" ||
+      formData.get("autoNotifyReminder") === "on",
+    autoNotifyHoursBefore: getStringValue(formData, "autoNotifyHoursBefore"),
+    notifyEnrollmentConfirmation: formData.has("notifyEnrollmentConfirmation")
+      ? formData.get("notifyEnrollmentConfirmation") === "true" ||
+        formData.get("notifyEnrollmentConfirmation") === "on"
+      : true,
     futebolType: getStringValue(formData, "futebolType"),
     goalkeeperLimit: getStringValue(formData, "goalkeeperLimit"),
     voleiType: getStringValue(formData, "voleiType"),
@@ -1793,6 +1805,12 @@ export async function createRachaAction(formData: FormData) {
           ? parsed.data.accessKey || null
           : null,
       cancellationWindowHours: parsed.data.cancellationWindowHours,
+      autoNotifyReminder: Boolean(parsed.data.autoNotifyReminder),
+      autoNotifyHoursBefore: parsed.data.autoNotifyReminder
+        ? parsed.data.autoNotifyHoursBefore || 2
+        : null,
+      notifyEnrollmentConfirmation:
+        parsed.data.notifyEnrollmentConfirmation ?? true,
       paymentDeadline,
       futebolType: parsed.data.futebolType || null,
       goalkeeperLimit: parsed.data.goalkeeperLimit || null,
@@ -1864,6 +1882,14 @@ export async function updateRachaAction(formData: FormData) {
       formData,
       "cancellationWindowHours",
     ),
+    autoNotifyReminder:
+      formData.get("autoNotifyReminder") === "true" ||
+      formData.get("autoNotifyReminder") === "on",
+    autoNotifyHoursBefore: getStringValue(formData, "autoNotifyHoursBefore"),
+    notifyEnrollmentConfirmation: formData.has("notifyEnrollmentConfirmation")
+      ? formData.get("notifyEnrollmentConfirmation") === "true" ||
+        formData.get("notifyEnrollmentConfirmation") === "on"
+      : true,
     futebolType: getStringValue(formData, "futebolType"),
     goalkeeperLimit: getStringValue(formData, "goalkeeperLimit"),
     voleiType: getStringValue(formData, "voleiType"),
@@ -1952,6 +1978,12 @@ export async function updateRachaAction(formData: FormData) {
           ? parsed.data.accessKey || null
           : null,
       cancellationWindowHours: parsed.data.cancellationWindowHours,
+      autoNotifyReminder: Boolean(parsed.data.autoNotifyReminder),
+      autoNotifyHoursBefore: parsed.data.autoNotifyReminder
+        ? parsed.data.autoNotifyHoursBefore || 2
+        : null,
+      notifyEnrollmentConfirmation:
+        parsed.data.notifyEnrollmentConfirmation ?? true,
       paymentDeadline,
       futebolType: parsed.data.futebolType || null,
       goalkeeperLimit: parsed.data.goalkeeperLimit || null,
@@ -2027,6 +2059,244 @@ export async function deleteRachaAction(formData: FormData) {
   revalidatePath("/dashboard");
   redirect(
     buildMessageUrl("/dashboard", "success", "Racha removido com sucesso."),
+  );
+}
+
+export async function closeRachaAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const rachaId = getStringValue(formData, "rachaId");
+  const callbackUrl = getStringValue(formData, "callbackUrl") || "/dashboard";
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: rachaId },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl(callbackUrl, "error", "Racha não encontrado."));
+  }
+
+  await prisma.racha.update({
+    where: { id: rachaId },
+    data: { status: "COMPLETED" },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/dashboard");
+  revalidatePath(`/dashboard/rachas/${rachaId}/edit`);
+  revalidatePath(`/rachas/${racha.slug}`);
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      `O racha "${racha.title}" foi encerrado com sucesso. As inscrições públicas foram bloqueadas.`,
+    ),
+  );
+}
+
+export async function reopenRachaAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const rachaId = getStringValue(formData, "rachaId");
+  const callbackUrl = getStringValue(formData, "callbackUrl") || "/dashboard";
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: rachaId },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl(callbackUrl, "error", "Racha não encontrado."));
+  }
+
+  await prisma.racha.update({
+    where: { id: rachaId },
+    data: { status: "PUBLISHED" },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/dashboard");
+  revalidatePath(`/dashboard/rachas/${rachaId}/edit`);
+  revalidatePath(`/rachas/${racha.slug}`);
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      `O racha "${racha.title}" foi reaberto com sucesso.`,
+    ),
+  );
+}
+
+export async function toggleRachaEnrollmentNotificationAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const rachaId = getStringValue(formData, "rachaId");
+  const callbackUrl =
+    getStringValue(formData, "callbackUrl") || `/dashboard/rachas/${rachaId}/edit`;
+
+  const racha = await prisma.racha.findUnique({
+    where: { id: rachaId },
+  });
+
+  if (
+    !racha ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: racha.id,
+      organizerId: racha.organizerId,
+    }))
+  ) {
+    redirect(buildMessageUrl(callbackUrl, "error", "Racha não encontrado."));
+  }
+
+  const nextValue = !(racha.notifyEnrollmentConfirmation ?? true);
+
+  await prisma.racha.update({
+    where: { id: rachaId },
+    data: {
+      notifyEnrollmentConfirmation: nextValue,
+    },
+  });
+
+  revalidatePath(`/dashboard/rachas/${rachaId}/edit`);
+  revalidatePath("/dashboard");
+
+  redirect(
+    buildMessageUrl(
+      callbackUrl,
+      "success",
+      nextValue
+        ? "Envio de confirmação de inscrição para atletas ativado com sucesso."
+        : "Envio de confirmação de inscrição para atletas desativado com sucesso.",
+    ),
+  );
+}
+
+export async function sendEnrollmentConfirmationAction(formData: FormData) {
+  const user = await requireUser("/dashboard");
+  const enrollmentId = getStringValue(formData, "enrollmentId");
+  const callbackUrl = getStringValue(formData, "callbackUrl");
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: {
+      racha: true,
+      user: { select: { nickname: true } },
+    },
+  });
+
+  const redirectUrl =
+    callbackUrl || `/dashboard/rachas/${enrollment?.rachaId ?? ""}/edit`;
+
+  if (
+    !enrollment ||
+    !(await canUserManageRacha({
+      userId: user.id,
+      rachaId: enrollment.rachaId,
+      organizerId: enrollment.racha.organizerId,
+    }))
+  ) {
+    redirect(
+      buildMessageUrl("/dashboard", "error", "Inscrição não encontrada."),
+    );
+  }
+
+  const organizerUser = await prisma.user.findUnique({
+    where: { id: enrollment.racha.organizerId },
+    select: { pixHolderName: true, name: true, phone: true },
+  });
+
+  const isFree = enrollment.racha.priceInCents === 0;
+  const isGoalkeeper = isGoalkeeperPosition(enrollment.participantPosition);
+  const isFreeOrGoalkeeper = isFree || isGoalkeeper;
+
+  try {
+    if (isFreeOrGoalkeeper || enrollment.paymentStatus === PaymentStatus.PAID) {
+      const message = buildFreeEnrollmentConfirmationMessage({
+        participantName: enrollment.participantName,
+        participantNickname: enrollment.user?.nickname,
+        rachaTitle: enrollment.racha.title,
+        rachaSlug: enrollment.racha.slug,
+        eventDate: enrollment.racha.eventDate,
+        eventEndDate: enrollment.racha.eventEndDate,
+        locationName: enrollment.racha.locationName,
+        address: enrollment.racha.address,
+      });
+
+      const res = await sendBotbotWhatsappMessage({
+        to: enrollment.participantPhone,
+        message,
+      });
+
+      if (!res.success) {
+        redirect(
+          buildMessageUrl(
+            redirectUrl,
+            "error",
+            res.error || "Erro ao enviar confirmação no WhatsApp.",
+          ),
+        );
+      }
+    } else {
+      const res = await sendPaidEnrollmentWhatsappNotification({
+        to: enrollment.participantPhone,
+        details: {
+          participantName: enrollment.participantName,
+          participantNickname: enrollment.user?.nickname,
+          rachaTitle: enrollment.racha.title,
+          rachaSlug: enrollment.racha.slug,
+          eventDate: enrollment.racha.eventDate,
+          eventEndDate: enrollment.racha.eventEndDate,
+          locationName: enrollment.racha.locationName,
+          address: enrollment.racha.address,
+          rachaCity: enrollment.racha.city,
+          priceInCents: enrollment.racha.priceInCents,
+          pixKey: enrollment.racha.pixKey,
+          pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
+          organizerDisplayName: enrollment.racha.organizerDisplayName,
+          organizerPhoneWhatsapp:
+            organizerUser?.phone || enrollment.racha.phoneWhatsapp,
+        },
+      });
+
+      if (!res.success) {
+        redirect(
+          buildMessageUrl(
+            redirectUrl,
+            "error",
+            res.error || "Erro ao enviar mensagem PIX no WhatsApp.",
+          ),
+        );
+      }
+    }
+  } catch (err) {
+    redirect(
+      buildMessageUrl(
+        redirectUrl,
+        "error",
+        err instanceof Error ? err.message : "Falha ao enviar mensagem.",
+      ),
+    );
+  }
+
+  redirect(
+    buildMessageUrl(
+      redirectUrl,
+      "success",
+      `Confirmação de inscrição enviada com sucesso para ${enrollment.participantName}!`,
+    ),
   );
 }
 
@@ -2123,7 +2393,7 @@ export async function joinRachaAction(formData: FormData) {
     redirect(buildMessageUrl(callbackUrl, "error", "Chave secreta inválida."));
   }
 
-  if (racha.eventDate <= new Date()) {
+  if (racha.status === "COMPLETED" || racha.eventDate <= new Date()) {
     redirect(
       buildMessageUrl(
         callbackUrl,
@@ -2361,32 +2631,11 @@ export async function joinRachaAction(formData: FormData) {
       select: { pixHolderName: true, name: true, phone: true },
     });
     const isFreeOrGoalkeeper = isFree || isGoalkeeperEnrollment;
+    const shouldNotify = racha.notifyEnrollmentConfirmation ?? true;
 
-    if (isFreeOrGoalkeeper) {
-      const message = buildFreeEnrollmentConfirmationMessage({
-        participantName: parsed.data.participantName,
-        participantNickname: userWithNick?.nickname,
-        rachaTitle: racha.title,
-        rachaSlug: racha.slug,
-        eventDate: racha.eventDate,
-        eventEndDate: racha.eventEndDate,
-        locationName: racha.locationName,
-        address: racha.address,
-      });
-
-      sendBotbotWhatsappMessage({
-        to: normalizedPhone,
-        message,
-      }).catch((err) => {
-        console.warn(
-          "Aviso ao notificar participante por WhatsApp na auto-inscrição:",
-          err,
-        );
-      });
-    } else {
-      sendPaidEnrollmentWhatsappNotification({
-        to: normalizedPhone,
-        details: {
+    if (shouldNotify) {
+      if (isFreeOrGoalkeeper) {
+        const message = buildFreeEnrollmentConfirmationMessage({
           participantName: parsed.data.participantName,
           participantNickname: userWithNick?.nickname,
           rachaTitle: racha.title,
@@ -2395,19 +2644,43 @@ export async function joinRachaAction(formData: FormData) {
           eventEndDate: racha.eventEndDate,
           locationName: racha.locationName,
           address: racha.address,
-          rachaCity: racha.city,
-          priceInCents: racha.priceInCents,
-          pixKey: racha.pixKey,
-          pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
-          organizerDisplayName: racha.organizerDisplayName,
-          organizerPhoneWhatsapp: organizerUser?.phone || racha.phoneWhatsapp,
-        },
-      }).catch((err) => {
-        console.warn(
-          "Aviso ao notificar participante por WhatsApp na auto-inscrição:",
-          err,
-        );
-      });
+        });
+
+        sendBotbotWhatsappMessage({
+          to: normalizedPhone,
+          message,
+        }).catch((err) => {
+          console.warn(
+            "Aviso ao notificar participante por WhatsApp na auto-inscrição:",
+            err,
+          );
+        });
+      } else {
+        sendPaidEnrollmentWhatsappNotification({
+          to: normalizedPhone,
+          details: {
+            participantName: parsed.data.participantName,
+            participantNickname: userWithNick?.nickname,
+            rachaTitle: racha.title,
+            rachaSlug: racha.slug,
+            eventDate: racha.eventDate,
+            eventEndDate: racha.eventEndDate,
+            locationName: racha.locationName,
+            address: racha.address,
+            rachaCity: racha.city,
+            priceInCents: racha.priceInCents,
+            pixKey: racha.pixKey,
+            pixHolderName: organizerUser?.pixHolderName || organizerUser?.name,
+            organizerDisplayName: racha.organizerDisplayName,
+            organizerPhoneWhatsapp: organizerUser?.phone || racha.phoneWhatsapp,
+          },
+        }).catch((err) => {
+          console.warn(
+            "Aviso ao notificar participante por WhatsApp na auto-inscrição:",
+            err,
+          );
+        });
+      }
     }
   } catch (error) {
     console.warn(

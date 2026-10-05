@@ -80,6 +80,7 @@ export const rachaFormSchema = z
       .max(72, "O tempo máximo é de 72 horas antes.")
       .optional()
       .or(z.literal("")),
+    notifyEnrollmentConfirmation: z.coerce.boolean().optional(),
     // Futebol
     futebolType: z.string().optional().or(z.literal("")),
     goalkeeperLimit: z.coerce
